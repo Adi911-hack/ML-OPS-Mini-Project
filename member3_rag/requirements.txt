@@ -1,0 +1,9 @@
+
+pymupdf
+chromadb
+sentence-transformers
+pytest
+langchain
+langchain-community
+langchain-chroma
+langchain-huggingface
