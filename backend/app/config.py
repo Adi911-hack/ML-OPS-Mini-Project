@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     postgres_db: str
     postgres_host: str
     postgres_port: int
+    redis_host: str
+    redis_port: int
 
     @property
     def database_url(self) -> URL:

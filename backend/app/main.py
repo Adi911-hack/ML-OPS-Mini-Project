@@ -6,13 +6,15 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from redis import RedisError
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import models  # noqa: F401
 from app.database import Base, engine
 from app.quarantine import clean_errors, list_rejected_claims, save_rejected_claim
-from app.runs import count_runs, create_run, get_run
+from app.runs import count_runs, create_run, finish_run, get_run
 from app.schemas import ClaimAccepted, ClaimRequest, RunResponse, RunStatus
+from app.task_queue import enqueue_run
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,12 @@ def health():
 @app.post("/claims", response_model=ClaimAccepted, status_code=status.HTTP_202_ACCEPTED)
 def submit_claim(claim: ClaimRequest):
     run_id = create_run(claim)
+    try:
+        enqueue_run(run_id)
+    except RedisError:
+        logger.exception("Could not queue run %s", run_id)
+        finish_run(run_id, error="Could not queue the run")
+        raise HTTPException(status_code=503, detail="Queue unavailable, please retry")
     return ClaimAccepted(run_id=run_id, status=RunStatus.queued)
 
 

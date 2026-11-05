@@ -33,3 +33,24 @@ def get_run(run_id):
 def count_runs():
     with SessionLocal() as session:
         return session.scalar(select(func.count()).select_from(Run))
+
+
+def start_run(run_id):
+    with SessionLocal() as session:
+        run = session.get(Run, run_id)
+        if run is None:
+            return None
+        run.status = RunStatus.running.value
+        session.commit()
+        return run.claim
+
+
+def finish_run(run_id, result=None, error=None):
+    with SessionLocal() as session:
+        run = session.get(Run, run_id)
+        if run is None:
+            return
+        run.status = RunStatus.failed.value if error else RunStatus.completed.value
+        run.result = result
+        run.error = error
+        session.commit()
