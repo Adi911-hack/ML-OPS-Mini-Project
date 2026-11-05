@@ -1,0 +1,8 @@
+@"
+.venv/
+__pycache__/
+.pytest_cache/
+member3_rag/chroma_db/
+member3_rag/chunks.json
+member3_rag/evaluation_results.json
+"@ | Set-Content .gitignore
