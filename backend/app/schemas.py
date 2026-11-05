@@ -68,3 +68,22 @@ class RunResponse(BaseModel):
     updated_at: datetime
     result: Optional[dict[str, Any]] = None
     error: Optional[str] = None
+
+
+class FeedbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    run_id: str = Field(min_length=1, max_length=36)
+    satisfactory: bool
+    reason: str = Field(min_length=3, max_length=1000)
+
+
+class FeedbackAccepted(BaseModel):
+    feedback_id: str
+
+
+class FeedbackSummary(BaseModel):
+    total: int
+    satisfactory: int
+    unsatisfactory: int
+    satisfaction_rate: Optional[float] = None

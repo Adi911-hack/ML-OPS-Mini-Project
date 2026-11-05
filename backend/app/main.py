@@ -11,9 +11,19 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app import models  # noqa: F401
 from app.database import Base, engine
+from app.feedback import feedback_summary, save_feedback
 from app.quarantine import clean_errors, list_rejected_claims, save_rejected_claim
+from app.rate_limit import WINDOW_SECONDS, is_rate_limited
 from app.runs import count_runs, create_run, finish_run, get_run
-from app.schemas import ClaimAccepted, ClaimRequest, RunResponse, RunStatus
+from app.schemas import (
+    ClaimAccepted,
+    ClaimRequest,
+    FeedbackAccepted,
+    FeedbackRequest,
+    FeedbackSummary,
+    RunResponse,
+    RunStatus,
+)
 from app.task_queue import enqueue_run
 
 logger = logging.getLogger(__name__)
@@ -26,6 +36,19 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Air Passenger Claim Triage API", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def limit_claim_submissions(request: Request, call_next):
+    if request.method == "POST" and request.url.path == "/claims":
+        client_id = request.client.host if request.client else "unknown"
+        if await run_in_threadpool(is_rate_limited, client_id):
+            return JSONResponse(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                content={"detail": "Rate limit exceeded, please retry later"},
+                headers={"Retry-After": str(WINDOW_SECONDS)},
+            )
+    return await call_next(request)
 
 
 @app.exception_handler(RequestValidationError)
@@ -82,3 +105,16 @@ def read_run(run_id: str):
 @app.get("/quarantine")
 def get_quarantine(limit: int = Query(default=20, ge=1, le=100)):
     return list_rejected_claims(limit)
+
+
+@app.post("/feedback", response_model=FeedbackAccepted, status_code=status.HTTP_201_CREATED)
+def submit_feedback(feedback: FeedbackRequest):
+    feedback_id = save_feedback(feedback)
+    if feedback_id is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return FeedbackAccepted(feedback_id=feedback_id)
+
+
+@app.get("/feedback/summary", response_model=FeedbackSummary)
+def get_feedback_summary():
+    return feedback_summary()

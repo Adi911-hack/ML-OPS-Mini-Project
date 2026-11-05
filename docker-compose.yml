@@ -6,6 +6,7 @@ x-backend-environment: &backend-environment
   POSTGRES_PORT: "5432"
   REDIS_HOST: redis
   REDIS_PORT: "6379"
+  RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:?set RATE_LIMIT_PER_MINUTE in .env}
 
 services:
   postgres:
@@ -61,3 +62,4 @@ services:
 
 volumes:
   postgres_data:
+
