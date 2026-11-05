@@ -1,5 +1,6 @@
+from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
@@ -9,6 +10,13 @@ class DisruptionType(str, Enum):
     cancellation = "cancellation"
     delay = "delay"
     downgrading = "downgrading"
+
+
+class RunStatus(str, Enum):
+    queued = "queued"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
 
 
 class ClaimRequest(BaseModel):
@@ -50,4 +58,13 @@ class ClaimRequest(BaseModel):
 
 class ClaimAccepted(BaseModel):
     run_id: str
-    status: str
+    status: RunStatus
+
+
+class RunResponse(BaseModel):
+    run_id: str
+    status: RunStatus
+    created_at: datetime
+    updated_at: datetime
+    result: Optional[dict[str, Any]] = None
+    error: Optional[str] = None

@@ -1,8 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
-from uuid import uuid4
 
-from fastapi import FastAPI, Query, Request, status
+from fastapi import FastAPI, HTTPException, Query, Request, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
@@ -12,7 +11,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from app import models  # noqa: F401
 from app.database import Base, engine
 from app.quarantine import clean_errors, list_rejected_claims, save_rejected_claim
-from app.schemas import ClaimAccepted, ClaimRequest
+from app.runs import count_runs, create_run, get_run
+from app.schemas import ClaimAccepted, ClaimRequest, RunResponse, RunStatus
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,21 @@ def health():
 
 @app.post("/claims", response_model=ClaimAccepted, status_code=status.HTTP_202_ACCEPTED)
 def submit_claim(claim: ClaimRequest):
-    return ClaimAccepted(run_id=str(uuid4()), status="queued")
+    run_id = create_run(claim)
+    return ClaimAccepted(run_id=run_id, status=RunStatus.queued)
+
+
+@app.get("/runs/count")
+def get_run_count():
+    return {"total_runs": count_runs()}
+
+
+@app.get("/runs/{run_id}", response_model=RunResponse)
+def read_run(run_id: str):
+    run = get_run(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return run
 
 
 @app.get("/quarantine")
