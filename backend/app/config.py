@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     redis_host: str
     redis_port: int
     rate_limit_per_minute: int
+    run_timeout_seconds: int
 
     @property
     def database_url(self) -> URL:
@@ -27,4 +28,5 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
 

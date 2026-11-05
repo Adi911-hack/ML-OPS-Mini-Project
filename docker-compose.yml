@@ -6,6 +6,7 @@ x-backend-environment: &backend-environment
   POSTGRES_PORT: "5432"
   REDIS_HOST: redis
   REDIS_PORT: "6379"
+  RUN_TIMEOUT_SECONDS: ${RUN_TIMEOUT_SECONDS:?set RUN_TIMEOUT_SECONDS in .env}
   RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:?set RATE_LIMIT_PER_MINUTE in .env}
 
 services:
@@ -55,6 +56,7 @@ services:
   agent-worker:
     build: ./backend
     command: ["python", "-m", "app.worker"]
+    restart: unless-stopped
     environment: *backend-environment
     depends_on:
       api:
@@ -62,4 +64,5 @@ services:
 
 volumes:
   postgres_data:
+
 

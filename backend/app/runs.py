@@ -1,4 +1,6 @@
-from sqlalchemy import func, select
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import func, select, update
 
 from app.database import SessionLocal
 from app.models import Run
@@ -38,7 +40,7 @@ def count_runs():
 def start_run(run_id):
     with SessionLocal() as session:
         run = session.get(Run, run_id)
-        if run is None:
+        if run is None or run.status != RunStatus.queued.value:
             return None
         run.status = RunStatus.running.value
         session.commit()
@@ -48,9 +50,27 @@ def start_run(run_id):
 def finish_run(run_id, result=None, error=None):
     with SessionLocal() as session:
         run = session.get(Run, run_id)
-        if run is None:
+        if run is None or run.status not in (RunStatus.queued.value, RunStatus.running.value):
             return
         run.status = RunStatus.failed.value if error else RunStatus.completed.value
         run.result = result
         run.error = error
         session.commit()
+
+
+def fail_stale_runs(max_age_seconds):
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)
+    with SessionLocal() as session:
+        outcome = session.execute(
+            update(Run)
+            .where(
+                Run.status.in_([RunStatus.queued.value, RunStatus.running.value]),
+                Run.updated_at < cutoff,
+            )
+            .values(
+                status=RunStatus.failed.value,
+                error="Run did not complete within the time limit",
+            )
+        )
+        session.commit()
+        return outcome.rowcount
