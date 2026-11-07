@@ -1,0 +1,27 @@
+
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1
+ENV HF_HOME=/home/appuser/.cache/huggingface
+ENV PIP_DEFAULT_TIMEOUT=180
+ENV PIP_RETRIES=8
+
+WORKDIR /app
+
+COPY backend/requirements.txt /tmp/backend-requirements.txt
+COPY backend/requirements-agents.txt /tmp/agent-requirements.txt
+COPY member3_rag/requirements.txt /tmp/rag-requirements.txt
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install \
+    -r /tmp/backend-requirements.txt \
+    -r /tmp/agent-requirements.txt \
+    -r /tmp/rag-requirements.txt
+
+COPY backend/app ./app
+
+RUN useradd --create-home appuser
+
+USER appuser
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
