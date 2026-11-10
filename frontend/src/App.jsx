@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from "react";
+import ResultPanel from "./ResultPanel";
 import "./App.css";
 
 const initialForm = {
@@ -20,6 +21,42 @@ const initialForm = {
   contact_details_provided: ""
 };
 
+async function readResponse(response) {
+  const text = await response.text();
+  let data = {};
+
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(`Invalid server response (HTTP ${response.status})`);
+    }
+  }
+
+  if (!response.ok) {
+    if (Array.isArray(data.errors)) {
+      throw new Error(
+        data.errors
+          .map((item) => {
+            const field = Array.isArray(item.loc)
+              ? item.loc.join(".")
+              : "Claim";
+            return `${field}: ${item.msg}`;
+          })
+          .join(" | ")
+      );
+    }
+
+    throw new Error(
+      typeof data.detail === "string"
+        ? data.detail
+        : `Request failed (HTTP ${response.status})`
+    );
+  }
+
+  return data;
+}
+
 function App() {
   const [form, setForm] = useState(initialForm);
   const [runId, setRunId] = useState("");
@@ -36,17 +73,19 @@ function App() {
   function prepareClaim() {
     const claim = { ...form };
 
-    ["booking_reference", "flight_number", "origin", "destination"].forEach((field) => {
-      claim[field] = claim[field].trim().toUpperCase();
-    });
+    ["booking_reference", "flight_number", "origin", "destination"].forEach(
+      (field) => {
+        claim[field] = claim[field].trim().toUpperCase();
+      }
+    );
 
-    claim.scheduled_departure = new Date(form.scheduled_departure).toISOString();
+    claim.scheduled_departure = new Date(
+      form.scheduled_departure
+    ).toISOString();
 
-    if (form.alternate_departure) {
-      claim.alternate_departure = new Date(form.alternate_departure).toISOString();
-    } else {
-      claim.alternate_departure = null;
-    }
+    claim.alternate_departure = form.alternate_departure
+      ? new Date(form.alternate_departure).toISOString()
+      : null;
 
     ["notice_minutes", "block_time_minutes"].forEach((field) => {
       claim[field] = form[field] === "" ? null : Number(form[field]);
@@ -65,6 +104,7 @@ function App() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+
     setLoading(true);
     setError("");
     setResult(null);
@@ -82,29 +122,16 @@ function App() {
         body: JSON.stringify(claim)
       });
 
-      const data = await response.json();
+      const data = await readResponse(response);
 
-      if (!response.ok) {
-        if (data.errors) {
-          throw new Error(
-            data.errors.map((item) => {
-              const field = Array.isArray(item.loc) ? item.loc.join(".") : "Claim";
-              return `${field}: ${item.msg}`;
-            }).join(" | ")
-          );
-        }
-
-        throw new Error(
-          typeof data.detail === "string"
-            ? data.detail
-            : "Claim submission failed"
-        );
+      if (!data.run_id) {
+        throw new Error("The backend did not return a Run ID");
       }
 
       setRunId(data.run_id);
-      setStatus(data.status);
+      setStatus(data.status || "queued");
     } catch (err) {
-      setError(err.message || "Could not connect to the backend");
+      setError(err.message || "Could not submit the claim");
     } finally {
       setLoading(false);
     }
@@ -116,16 +143,18 @@ function App() {
     }
 
     let active = true;
+    let polling = false;
 
     async function checkStatus() {
+      if (polling) return;
+      polling = true;
+
       try {
-        const response = await fetch(`/api/runs/${encodeURIComponent(runId)}`);
+        const response = await fetch(
+          `/api/runs/${encodeURIComponent(runId)}`
+        );
 
-        if (!response.ok) {
-          throw new Error("Could not retrieve claim status");
-        }
-
-        const data = await response.json();
+        const data = await readResponse(response);
 
         if (!active) return;
 
@@ -133,6 +162,7 @@ function App() {
 
         if (data.status === "completed") {
           setResult(data.result);
+          setError("");
         }
 
         if (data.status === "failed") {
@@ -140,8 +170,10 @@ function App() {
         }
       } catch (err) {
         if (active) {
-          setError(err.message);
+          setError(err.message || "Could not retrieve claim status");
         }
+      } finally {
+        polling = false;
       }
     }
 
@@ -156,11 +188,12 @@ function App() {
   }, [runId, status]);
 
   function resetForm() {
-    setForm(initialForm);
+    setForm({ ...initialForm });
     setRunId("");
     setStatus("");
     setResult(null);
     setError("");
+    setLoading(false);
   }
 
   return (
@@ -358,49 +391,35 @@ function App() {
             />
           </label>
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Submitting..." : "Submit Claim"}
-          </button>
+          <div className="form-actions">
+            <button type="submit" disabled={loading}>
+              {loading ? "Submitting..." : "Submit Claim"}
+            </button>
 
-          <button type="button" onClick={resetForm} style={{ marginLeft: 10 }}>
-            Clear Form
-          </button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={resetForm}
+            >
+              Clear Form
+            </button>
+          </div>
         </form>
 
         {(runId || error) && (
-          <section className="result-section">
-            <h2>Claim Processing Status</h2>
-
-            {runId && <p><strong>Run ID:</strong> {runId}</p>}
-
-            {status && (
-              <p>
-                <strong>Status:</strong> {status.toUpperCase()}
-              </p>
-            )}
-
-            {(status === "queued" || status === "running") && (
-              <p>Your claim is being processed...</p>
-            )}
-
-            {error && <p className="error-message">{error}</p>}
-
-            {status === "completed" && (
-              <div>
-                <h3>Backend Response</h3>
-                <pre>{JSON.stringify(result, null, 2)}</pre>
-                <p>
-                  The current backend may still use a stub agent.
-                  A completed run does not necessarily mean that
-                  compensation has been approved.
-                </p>
-              </div>
-            )}
-          </section>
+          <ResultPanel
+            key={runId}
+            runId={runId}
+            status={status}
+            result={result}
+            error={error}
+          />
         )}
       </main>
 
-      <footer>ML System Design & AgentOps — Mini Project 04</footer>
+      <footer>
+        ML System Design & AgentOps — Mini Project 04
+      </footer>
     </div>
   );
 }
