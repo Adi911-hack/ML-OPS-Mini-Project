@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from redis import RedisError
 from sqlalchemy.exc import SQLAlchemyError
+from app.metrics import metrics_app, record_metrics
 
 from app import models  # noqa: F401
 from app.database import Base, engine
@@ -36,6 +37,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Air Passenger Claim Triage API", lifespan=lifespan)
+app.middleware("http")(record_metrics)
+app.mount("/metrics", metrics_app)
 
 
 @app.middleware("http")

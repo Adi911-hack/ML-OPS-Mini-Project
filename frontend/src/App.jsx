@@ -38,10 +38,14 @@ async function readResponse(response) {
       throw new Error(
         data.errors
           .map((item) => {
-            const field = Array.isArray(item.loc)
-              ? item.loc.join(".")
-              : "Claim";
-            return `${field}: ${item.msg}`;
+            const field =
+              item.field ||
+              (Array.isArray(item.loc) ? item.loc.join(".") : "Claim");
+
+            const message =
+              item.message || item.msg || "Invalid input";
+
+            return `${field}: ${message}`;
           })
           .join(" | ")
       );

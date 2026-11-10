@@ -1,0 +1,8 @@
+
+services:
+  locust:
+    command:
+      - -f
+      - /mnt/locust/claims_locustfile.py
+      - --host
+      - http://api:8000
