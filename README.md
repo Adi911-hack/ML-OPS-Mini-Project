@@ -56,3 +56,19 @@ an exception marks the run as failed.
 
 Development failures are recorded in `docs/incident-log.md`.
 
+
+## Service addresses
+
+| Service | Address |
+|---|---|
+| Web client | http://127.0.0.1:8080 |
+| API documentation | http://127.0.0.1:8000/docs |
+| Grafana dashboards | http://127.0.0.1:3000 (login from `.env`) |
+| Prometheus | http://127.0.0.1:9090 |
+| Jaeger traces | http://127.0.0.1:16686 |
+
+Load testing is optional and starts only when requested:
+
+    docker compose --profile loadtest up -d locust
+
+The Locust web interface is then at http://127.0.0.1:8089
