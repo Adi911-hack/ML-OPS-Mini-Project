@@ -6,6 +6,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from opentelemetry import trace
 from redis import RedisError
 from sqlalchemy.exc import SQLAlchemyError
 from app.metrics import metrics_app, record_metrics
@@ -83,6 +84,7 @@ def health():
 @app.post("/claims", response_model=ClaimAccepted, status_code=status.HTTP_202_ACCEPTED)
 def submit_claim(claim: ClaimRequest):
     run_id = create_run(claim)
+    trace.get_current_span().set_attribute("run_id", run_id)
     try:
         enqueue_run(run_id)
     except RedisError:

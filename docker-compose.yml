@@ -77,6 +77,14 @@ services:
       <<: *backend-environment
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:?set GOOGLE_API_KEY in .env}
       MODEL_NAME: ${MODEL_NAME:?set MODEL_NAME in .env}
+      OTEL_SERVICE_NAME: air-passenger-worker
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_TRACES_SAMPLER: always_on
+    command: ["opentelemetry-instrument", "python", "-m", "app.worker"]
     depends_on:
       api:
         condition: service_healthy

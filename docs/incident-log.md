@@ -59,3 +59,30 @@ worker with docker compose up -d. All 12 API tests then passed.
 
 **Note:** The backend correctly marked these runs failed rather than returning an
 answer.
+
+## INC-005: Worker image build failed on corrupted downloads (2026-11-11)
+
+**Symptom:** docker compose up --build failed twice at the agent and RAG package
+step with "THESE PACKAGES DO NOT MATCH THE HASHES", after about 30 minutes.
+
+**Cause:** Package downloads were corrupted on a slow connection (about 150 kB/s).
+pip correctly refused them. Each retry downloaded every package again, because
+the step disabled pip's download cache.
+
+**Fix:** The agent and RAG package step now uses a Docker build cache for pip
+downloads, so a retry only fetches what is missing. The Dockerfile was also
+reordered so code changes rebuild only the final layer.
+
+## INC-006: Real agent runs failed with provider overload (2026-11-11)
+
+**Symptom:** Several valid claims were marked failed during testing.
+
+**Confirmation:** The worker log showed 503 UNAVAILABLE from the model provider:
+"This model is currently experiencing high demand."
+
+**Behaviour:** The entitlement agent used its fallback research plan, but the run
+still failed overall. The backend correctly marked these runs failed rather than
+returning an answer.
+
+**Follow-up:** Retries with backoff, a circuit breaker and a fallback path are
+needed on every model call (A5).
