@@ -41,7 +41,16 @@ services:
       context: .
       dockerfile: backend/Dockerfile
       target: api
-    environment: *backend-environment
+    environment:
+      <<: *backend-environment
+      OTEL_SERVICE_NAME: air-passenger-api
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_TRACES_SAMPLER: always_on
+    command: ["opentelemetry-instrument", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -49,6 +58,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      jaeger:
+        condition: service_started
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
       interval: 10s
@@ -70,5 +81,69 @@ services:
       api:
         condition: service_healthy
 
+  frontend:
+    build: ./frontend
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  jaeger:
+    image: cr.jaegertracing.io/jaegertracing/jaeger:2.23.0
+    ports:
+      - "127.0.0.1:16686:16686"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.4.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    restart: unless-stopped
+
+  blackbox:
+    image: prom/blackbox-exporter:v0.26.0
+    command:
+      - --config.file=/etc/blackbox_exporter/config.yml
+    volumes:
+      - ./monitoring/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:12.0.2
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?set GRAFANA_ADMIN_USER in .env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  locust:
+    image: locustio/locust:latest
+    profiles: ["loadtest"]
+    command: ["-f", "/mnt/locust/claims_locustfile.py", "--host", "http://api:8000"]
+    volumes:
+      - ./load_testing:/mnt/locust:ro
+    ports:
+      - "127.0.0.1:8089:8089"
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   postgres_data:
+  prometheus_data:
+  grafana_data:
