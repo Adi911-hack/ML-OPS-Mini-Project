@@ -9,10 +9,24 @@ from member3_rag.rag_interface import (
     search_corpus,
     DOCUMENTS_DIR
 )
+from member3_rag.process_documents import clean_text
 
 
 def normalize(text):
     return re.sub(r"\s+", " ", text).strip()
+
+
+def normalize_source(text):
+    text = clean_text(text)
+
+    text = re.sub(
+        r"CIVIL AVIATION REQUIREMENTS\s+SERIES\s*[‘'\"`]M[’'\"`]\s*PART IV\s+SECTION 3\s+6TH AUGUST, 2010\s+\d+\s+Rev\.\s*4,\s*dated\s*25th Jan,\s*2023",
+        " ",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    return normalize(text)
 
 
 @pytest.mark.parametrize("clause_id,page", [
@@ -51,11 +65,16 @@ def test_text_matches_original_pdf(clause_id):
             page.get_text("text") for page in pdf
         )
 
-    assert normalize(result["text"]) in normalize(original)
+    original = normalize_source(original)
+    retrieved = normalize_source(result["text"])
+
+    assert retrieved in original
 
 
 def test_six_hour_delay_clause():
     result = get_clause_by_id("DGCA:3.4.2")
+
+    assert result is not None
 
     text = result["text"].lower()
 
@@ -67,6 +86,8 @@ def test_six_hour_delay_clause():
 
 def test_extraordinary_circumstances_clause():
     result = get_clause_by_id("DGCA:3.4.4")
+
+    assert result is not None
 
     text = normalize(result["text"]).lower()
 
