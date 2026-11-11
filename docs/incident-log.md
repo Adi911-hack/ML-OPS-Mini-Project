@@ -31,3 +31,31 @@ the next, using a 2-second stub agent.
 
 **Cause status:** Not fully confirmed. Slow localhost name resolution on Windows
 is suspected, but it was not measured separately.
+
+## INC-003: Docker engine would not start after WSL update check (2026-11-11)
+
+**Symptom:** Docker Desktop showed "WSL needs updating" and the engine stopped,
+so no containers could build or run.
+
+**Investigation:** wsl --update and wsl --update --web-download both failed with
+Forbidden (403), error Wsl/UpdatePackage/HTTP_E_STATUS_FORBIDDEN.
+
+**Fix:** A later wsl --update reported the latest version was installed (WSL
+3.0.5.0). Ran wsl --shutdown and restarted Docker Desktop, and the engine started.
+
+**Cause status:** The 403 was most likely a network or download-source block. Not
+confirmed.
+
+## INC-004: Agent runs failed with an invalid API key (2026-11-11)
+
+**Symptom:** Valid claims were marked failed within seconds of reaching the
+worker.
+
+**Confirmation:** The run error showed 400 API_KEY_INVALID from the model
+provider, with placeholder text still set as the model name.
+
+**Fix:** Set real GOOGLE_API_KEY and MODEL_NAME values in .env and recreated the
+worker with docker compose up -d. All 12 API tests then passed.
+
+**Note:** The backend correctly marked these runs failed rather than returning an
+answer.
