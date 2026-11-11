@@ -1,0 +1,504 @@
+{
+  "total_scenarios": 20,
+  "scenarios_with_expected_clauses": 19,
+  "expected_clause_references": 29,
+  "retrieved_clause_references": 13,
+  "clause_recall_at_k": 0.4483,
+  "all_clauses_hit_rate": 0.3158,
+  "mean_reciprocal_rank_per_clause": 0.2649,
+  "missing_reference_ids": [
+    "DGCA:1.4",
+    "DGCA:1.5",
+    "DGCA:2.6"
+  ],
+  "top_k": 5,
+  "results": [
+    {
+      "id": "SC01",
+      "category": "delay",
+      "claim": "My domestic flight was delayed by 7 hours. What are my options?",
+      "expected_clauses": [
+        "DGCA:3.4.2"
+      ],
+      "retrieved_clauses": [
+        "DGCA:3.4.2",
+        "MOCA:P4",
+        "DGCA:3.3",
+        "DGCA:3.4.4",
+        "MOCA:P3"
+      ],
+      "found_clauses": [
+        "DGCA:3.4.2"
+      ],
+      "missing_references": [],
+      "ranks": {
+        "DGCA:3.4.2": 1
+      },
+      "all_expected_found": true,
+      "expected_outcome": "Alternate flight or refund options",
+      "expected_route": "request_further_evidence"
+    },
+    {
+      "id": "SC02",
+      "category": "delay",
+      "claim": "My flight has a block time of 2 hours. I checked in on time and departure is delayed by 3 hours.",
+      "expected_clauses": [
+        "DGCA:3.4.1",
+        "DGCA:3.8.1"
+      ],
+      "retrieved_clauses": [
+        "DGCA:3.4.1",
+        "MOCA:P4",
+        "DGCA:3.4.2",
+        "DGCA:3.4.3",
+        "DGCA:3.4.4"
+      ],
+      "found_clauses": [
+        "DGCA:3.4.1"
+      ],
+      "missing_references": [],
+      "ranks": {
+        "DGCA:3.4.1": 1
+      },
+      "all_expected_found": false,
+      "expected_outcome": "Meals and refreshments subject to applicable conditions",
+      "expected_route": "pay_as_computed"
+    },
+    {
+      "id": "SC03",
+      "category": "delay",
+      "claim": "My flight was scheduled to depart at 10 PM but has been delayed by 8 hours.",
+      "expected_clauses": [
+        "DGCA:3.4.3",
+        "DGCA:3.8.1"
+      ],
+      "retrieved_clauses": [
+        "DGCA:3.4.2",
+        "DGCA:3.4.4",
+        "MOCA:P4",
+        "DGCA:3.4.1",
+        "DGCA:3.4.3"
+      ],
+      "found_clauses": [
+        "DGCA:3.4.3"
+      ],
+      "missing_references": [],
+      "ranks": {
+        "DGCA:3.4.3": 5
+      },
+      "all_expected_found": false,
+      "expected_outcome": "Hotel accommodation and transfer facilities subject to applicable conditions",
+      "expected_route": "pay_as_computed"
+    },
+    {
+      "id": "SC04",
+      "category": "delay",
+      "claim": "My flight was delayed by an hour. It has a block time of 2 hours and I checked in on time.",
+      "expected_clauses": [
+        "DGCA:3.4.1"
+      ],
+      "retrieved_clauses": [
+        "DGCA:3.4.1",
+        "DGCA:3.4.2",
+        "MOCA:P4",
+        "DGCA:3.4.4",
+        "DGCA:3.4.3"
+      ],
+      "found_clauses": [
+        "DGCA:3.4.1"
+      ],
+      "missing_references": [],
+      "ranks": {
+        "DGCA:3.4.1": 1
+      },
+      "all_expected_found": true,
+      "expected_outcome": "Specified meal threshold not reached",
+      "expected_route": "decline"
+    },
+    {
+      "id": "SC05",
+      "category": "cancellation",
+      "claim": "My flight was cancelled and I was informed three weeks before departure.",
+      "expected_clauses": [
+        "DGCA:3.3.1"
+      ],
+      "retrieved_clauses": [
+        "DGCA:3.3",
+        "DGCA:3.3.1",
+        "MOCA:P5",
+        "MOCA:P11",
+        "DGCA:3.4.2"
+      ],
+      "found_clauses": [
+        "DGCA:3.3.1"
+      ],
+      "missing_references": [],
+      "ranks": {
+        "DGCA:3.3.1": 2
+      },
+      "all_expected_found": true,
+      "expected_outcome": "Alternate flight or refund as acceptable to passenger",
+      "expected_route": "request_further_evidence"
+    },
+    {
+      "id": "SC06",
+      "category": "cancellation",
+      "claim": "My flight was cancelled. I was told 90 minutes before departure, was already at the airport, and accepted an alternative flight four hours later.",
+      "expected_clauses": [
+        "DGCA:3.3.2",
+        "DGCA:3.8.1"
+      ],
+      "retrieved_clauses": [
+        "DGCA:3.3",
+        "MOCA:P5",
+        "DGCA:3.3.1",
+        "DGCA:3.4.2",
+        "MOCA:P6"
+      ],
+      "found_clauses": [],
+      "missing_references": [],
+      "ranks": {},
+      "all_expected_found": false,
+      "expected_outcome": "No cancellation compensation under the assignment scenario; meals and refreshments while waiting",
+      "expected_route": "decline"
+    },
+    {
+      "id": "SC07",
+      "category": "cancellation",
+      "claim": "My flight was cancelled at the last minute. I declined the alternative flight and requested a full refund. The flight block time was 90 minutes.",
+      "expected_clauses": [
+        "DGCA:3.3.1",
+        "DGCA:3.3.2"
+      ],
+      "retrieved_clauses": [
+        "MOCA:P5",
+        "DGCA:3.3",
+        "DGCA:3.4.2",
+        "DGCA:3.3.1",
+        "MOCA:P7"
+      ],
+      "found_clauses": [
+        "DGCA:3.3.1"
+      ],
+      "missing_references": [],
+      "ranks": {
+        "DGCA:3.3.1": 4
+      },
+      "all_expected_found": false,
+      "expected_outcome": "Assess compensation and refund subject to notice and exception conditions",
+      "expected_route": "request_further_evidence"
+    },
+    {
+      "id": "SC08",
+      "category": "cancellation",
+      "claim": "My flight was cancelled unexpectedly, but I never provided a phone number or email during booking.",
+      "expected_clauses": [
+        "DGCA:3.3.3"
+      ],
+      "retrieved_clauses": [
+        "DGCA:3.3",
+        "MOCA:P5",
+        "DGCA:3.3.1",
+        "MOCA:P11",
+        "DGCA:3.3.3"
+      ],
+      "found_clauses": [
+        "DGCA:3.3.3"
+      ],
+      "missing_references": [],
+      "ranks": {
+        "DGCA:3.3.3": 5
+      },
+      "all_expected_found": true,
+      "expected_outcome": "Financial compensation exclusion; refund or alternate arrangements still considered",
+      "expected_route": "decline"
+    },
+    {
+      "id": "SC09",
+      "category": "denied_boarding",
+      "claim": "I was denied boarding due to overbooking, but the airline arranged a replacement flight departing 45 minutes later.",
+      "expected_clauses": [
+        "DGCA:3.2.2"
+      ],
+      "retrieved_clauses": [
+        "MOCA:P6",
+        "MOCA:P11",
+        "DGCA:2.5",
+        "DGCA:3.3",
+        "MOCA:P3"
+      ],
+      "found_clauses": [],
+      "missing_references": [],
+      "ranks": {},
+      "all_expected_found": false,
+      "expected_outcome": "No denied-boarding compensation under the one-hour provision",
+      "expected_route": "decline"
+    },
+    {
+      "id": "SC10",
+      "category": "denied_boarding",
+      "claim": "I was denied boarding involuntarily due to overbooking. My replacement flight departs 10 hours later.",
+      "expected_clauses": [
+        "DGCA:3.2.2"
+      ],
+      "retrieved_clauses": [
+        "MOCA:P6",
+        "MOCA:P11",
+        "DGCA:2.5",
+        "MOCA:P3",
+        "DGCA:3.3"
+      ],
+      "found_clauses": [],
+      "missing_references": [],
+      "ranks": {},
+      "all_expected_found": false,
+      "expected_outcome": "Evaluate compensation under the within-24-hours provision",
+      "expected_route": "request_further_evidence"
+    },
+    {
+      "id": "SC11",
+      "category": "denied_boarding",
+      "claim": "I had a confirmed ticket but was denied boarding because I arrived at the gate after boarding closed.",
+      "expected_clauses": [
+        "DGCA:2.6",
+        "INDIGO:9.3"
+      ],
+      "retrieved_clauses": [
+        "MOCA:P6",
+        "MOCA:P11",
+        "INDIGO:9.3",
+        "DGCA:2.5",
+        "DGCA:3.10.2"
+      ],
+      "found_clauses": [
+        "INDIGO:9.3"
+      ],
+      "missing_references": [
+        "DGCA:2.6"
+      ],
+      "ranks": {
+        "INDIGO:9.3": 3
+      },
+      "all_expected_found": false,
+      "expected_outcome": "Check boarding compliance and whether denial qualifies under the regulation",
+      "expected_route": "request_further_evidence"
+    },
+    {
+      "id": "SC12",
+      "category": "denied_boarding",
+      "claim": "The airline overbooked my flight and denied me boarding. I did not accept any alternative flight.",
+      "expected_clauses": [
+        "DGCA:3.2.2"
+      ],
+      "retrieved_clauses": [
+        "MOCA:P6",
+        "DGCA:3.3",
+        "MOCA:P11",
+        "MOCA:P5",
+        "MOCA:P3"
+      ],
+      "found_clauses": [],
+      "missing_references": [],
+      "ranks": {},
+      "all_expected_found": false,
+      "expected_outcome": "Evaluate full refund and applicable denied-boarding compensation",
+      "expected_route": "request_further_evidence"
+    },
+    {
+      "id": "SC13",
+      "category": "downgrading",
+      "claim": "I booked business class for a domestic flight but was involuntarily moved to economy.",
+      "expected_clauses": [
+        "DGCA:3.5.1"
+      ],
+      "retrieved_clauses": [
+        "DGCA:3.5.1",
+        "MOCA:P2",
+        "DGCA:3.10.1",
+        "DGCA:3.1",
+        "DGCA:3.3.3"
+      ],
+      "found_clauses": [
+        "DGCA:3.5.1"
+      ],
+      "missing_references": [],
+      "ranks": {
+        "DGCA:3.5.1": 1
+      },
+      "all_expected_found": true,
+      "expected_outcome": "Assess domestic involuntary downgrade reimbursement",
+      "expected_route": "request_further_evidence"
+    },
+    {
+      "id": "SC14",
+      "category": "downgrading",
+      "claim": "I was involuntarily downgraded on an international flight of 1200 km.",
+      "expected_clauses": [
+        "DGCA:3.5.1"
+      ],
+      "retrieved_clauses": [
+        "DGCA:2.10",
+        "DGCA:3.5.1",
+        "DGCA:3.3",
+        "DGCA:3.4.4",
+        "DGCA:3.4.2"
+      ],
+      "found_clauses": [
+        "DGCA:3.5.1"
+      ],
+      "missing_references": [],
+      "ranks": {
+        "DGCA:3.5.1": 2
+      },
+      "all_expected_found": true,
+      "expected_outcome": "Assess international downgrade reimbursement for distance up to 1500 km",
+      "expected_route": "request_further_evidence"
+    },
+    {
+      "id": "SC15",
+      "category": "downgrading",
+      "claim": "I voluntarily accepted an economy seat instead of my booked business-class seat.",
+      "expected_clauses": [
+        "DGCA:3.5.1"
+      ],
+      "retrieved_clauses": [
+        "MOCA:P6",
+        "INDIGO:8.2",
+        "DGCA:3.2.1",
+        "DGCA:3.9",
+        "INDIGO:10.2"
+      ],
+      "found_clauses": [],
+      "missing_references": [],
+      "ranks": {},
+      "all_expected_found": false,
+      "expected_outcome": "Involuntary downgrade provision may not apply",
+      "expected_route": "request_further_evidence"
+    },
+    {
+      "id": "SC16",
+      "category": "exception",
+      "claim": "My flight was delayed because of severe weather. The airline says it was beyond their control, but I dispute this.",
+      "expected_clauses": [
+        "DGCA:1.4",
+        "DGCA:1.5",
+        "DGCA:3.4.4"
+      ],
+      "retrieved_clauses": [
+        "DGCA:3.4.4",
+        "DGCA:3.3",
+        "DGCA:3.3.4",
+        "DGCA:3.4.2",
+        "DGCA:3.10.3"
+      ],
+      "found_clauses": [
+        "DGCA:3.4.4"
+      ],
+      "missing_references": [
+        "DGCA:1.4",
+        "DGCA:1.5"
+      ],
+      "ranks": {
+        "DGCA:3.4.4": 1
+      },
+      "all_expected_found": false,
+      "expected_outcome": "Cause attribution disputed",
+      "expected_route": "human_escalation"
+    },
+    {
+      "id": "SC17",
+      "category": "exception",
+      "claim": "My flight was cancelled because of an air traffic control restriction that the airline says could not be avoided.",
+      "expected_clauses": [
+        "DGCA:1.5",
+        "DGCA:3.3.4"
+      ],
+      "retrieved_clauses": [
+        "DGCA:3.3",
+        "DGCA:3.3.4",
+        "DGCA:3.10.3",
+        "DGCA:3.4.4",
+        "MOCA:P5"
+      ],
+      "found_clauses": [
+        "DGCA:3.3.4"
+      ],
+      "missing_references": [
+        "DGCA:1.5"
+      ],
+      "ranks": {
+        "DGCA:3.3.4": 2
+      },
+      "all_expected_found": false,
+      "expected_outcome": "Assess extraordinary-circumstances exemption with supporting evidence",
+      "expected_route": "request_further_evidence"
+    },
+    {
+      "id": "SC18",
+      "category": "missing_evidence",
+      "claim": "My flight was cancelled. I want compensation, but I do not know when I received the cancellation notice.",
+      "expected_clauses": [
+        "DGCA:3.3.1",
+        "DGCA:3.3.2"
+      ],
+      "retrieved_clauses": [
+        "DGCA:3.3.4",
+        "MOCA:P11",
+        "MOCA:P5",
+        "DGCA:3.3",
+        "DGCA:3.3.1"
+      ],
+      "found_clauses": [
+        "DGCA:3.3.1"
+      ],
+      "missing_references": [],
+      "ranks": {
+        "DGCA:3.3.1": 5
+      },
+      "all_expected_found": false,
+      "expected_outcome": "Cancellation notice timing required",
+      "expected_route": "request_further_evidence"
+    },
+    {
+      "id": "SC19",
+      "category": "out_of_scope",
+      "claim": "I want compensation for a domestic train journey delayed by five hours.",
+      "expected_clauses": [],
+      "retrieved_clauses": [
+        "DGCA:3.4.3",
+        "DGCA:3.3.4",
+        "MOCA:P11",
+        "DGCA:3.2.3",
+        "MOCA:P6"
+      ],
+      "found_clauses": [],
+      "missing_references": [],
+      "ranks": {},
+      "all_expected_found": null,
+      "expected_outcome": "Claim is outside the aviation corpus",
+      "expected_route": "human_escalation"
+    },
+    {
+      "id": "SC20",
+      "category": "missing_evidence",
+      "claim": "My airline cancelled my flight and I am requesting compensation, but I cannot provide the flight details, booking record, or cancellation notice.",
+      "expected_clauses": [
+        "DGCA:3.3.1",
+        "DGCA:3.3.2"
+      ],
+      "retrieved_clauses": [
+        "MOCA:P11",
+        "DGCA:3.3.4",
+        "MOCA:P5",
+        "DGCA:3.3",
+        "DGCA:3.10.2"
+      ],
+      "found_clauses": [],
+      "missing_references": [],
+      "ranks": {},
+      "all_expected_found": false,
+      "expected_outcome": "Request evidence before determining entitlement",
+      "expected_route": "request_further_evidence"
+    }
+  ]
+}

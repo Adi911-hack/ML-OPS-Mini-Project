@@ -1,5 +1,4 @@
 
-from ast import pattern
 from pathlib import Path
 from functools import lru_cache
 from bisect import bisect_right
@@ -50,14 +49,15 @@ def extract_numbered_clauses(source, filename):
     full_text = "\n".join(pages)
 
     pattern = re.compile(
-        r"(?m)^[ \t]*(\d+(?:\.\d+){1,2})[ \t]+(?=[A-Z])"
-)
+        r"(?m)^[ \t]*(\d+(?:\.\d+){1,2})(?:[ \t]+(?=[A-Z])|[ \t]*(?=\r?$))"
+    )
 
     matches = list(pattern.finditer(full_text))
     clauses = []
 
     for i, match in enumerate(matches):
         start = match.start()
+
         end = (
             matches[i + 1].start()
             if i + 1 < len(matches)
@@ -65,7 +65,17 @@ def extract_numbered_clauses(source, filename):
         )
 
         clause_number = match.group(1)
-        text = full_text[start:end].strip()
+
+        text = clean_text(full_text[start:end])
+
+        text = re.sub(
+            r"CIVIL AVIATION REQUIREMENTS\s+SERIES\s*[‘'\"`]M[’'\"`]\s*PART IV\s+SECTION 3\s+6TH AUGUST, 2010\s+\d+\s+Rev\.\s*4,\s*dated\s*25th Jan,\s*2023",
+            " ",
+            text,
+            flags=re.IGNORECASE
+        )
+
+        text = re.sub(r"\s+", " ", text).strip()
 
         if len(text) < 30:
             continue
@@ -164,7 +174,9 @@ def build_corpus():
             ]
         )
 
-        print(f"Indexed {min(start + 32, len(passages))}/{len(passages)}")
+        print(
+            f"Indexed {min(start + 32, len(passages))}/{len(passages)}"
+        )
 
     print(f"Clause database ready: {collection.count()} passages")
 
@@ -175,7 +187,9 @@ def get_collection():
     names = [c.name for c in client.list_collections()]
 
     if COLLECTION_NAME not in names:
-        raise RuntimeError("Run rag_interface.py --build first.")
+        raise RuntimeError(
+            "Run python -m member3_rag.rag_interface --build first."
+        )
 
     return client.get_collection(COLLECTION_NAME)
 
@@ -184,8 +198,8 @@ def search_corpus(query: str, top_k: int = 5) -> list[dict]:
     if not isinstance(query, str) or not query.strip():
         raise ValueError("Query cannot be empty.")
 
-    if top_k < 1:
-        raise ValueError("top_k must be positive.")
+    if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k < 1:
+        raise ValueError("top_k must be a positive integer.")
 
     collection = get_collection()
 
@@ -245,6 +259,7 @@ def main():
     parser.add_argument("--build", action="store_true")
     parser.add_argument("--query", type=str)
     parser.add_argument("--clause", type=str)
+
     args = parser.parse_args()
 
     if args.build:
@@ -264,4 +279,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
