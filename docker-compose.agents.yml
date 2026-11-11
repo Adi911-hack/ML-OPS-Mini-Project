@@ -1,0 +1,29 @@
+
+services:
+  postgres:
+    ports: !override
+      - "127.0.0.1:55432:5432"
+
+  redis:
+    ports: !override
+      - "127.0.0.1:56379:6379"
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.agents
+    environment:
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:?set GOOGLE_API_KEY in .env}
+      MODEL_NAME: ${MODEL_NAME:?set MODEL_NAME in .env}
+    volumes:
+      - ./member3_rag:/app/member3_rag
+
+  agent-worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.agents
+    environment:
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:?set GOOGLE_API_KEY in .env}
+      MODEL_NAME: ${MODEL_NAME:?set MODEL_NAME in .env}
+    volumes:
+      - ./member3_rag:/app/member3_rag
