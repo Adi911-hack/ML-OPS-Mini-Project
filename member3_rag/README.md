@@ -55,3 +55,47 @@ The ChromaDB index is generated locally and is not committed to Git.
 Clause extraction is preliminary. Retrieved passages must be verified against the source documents before final entitlement recommendations.
 
 The original chunk-level evaluation and clause-level evaluation are separate.
+
+## RAG Evaluation Results
+
+### Evaluation Setup
+
+The RAG module was evaluated using 20 passenger compensation scenarios covering flight delays, cancellations, denied boarding, downgrading, exceptions, missing evidence, and out-of-scope claims.
+
+Of the 20 scenarios, 19 were scored for retrieval performance. The remaining out-of-scope scenario contained no expected regulatory clause references.
+
+Retrieval was evaluated using the top five returned passages (Recall@5).
+
+### Before and After Improvements
+
+| Metric | Baseline | Improved |
+|---|---:|---:|
+| Indexed passages | 71 | 87 |
+| Clause Recall@5 | 44.83% | 58.62% |
+| Expected references retrieved | 13/29 | 17/29 |
+| All-clauses hit rate | 31.58% | 47.37% |
+| Mean reciprocal rank per clause | 0.2649 | 0.3741 |
+| Missing reference IDs | 3 | 0 |
+
+### Improvements Implemented
+
+- Updated numbered-clause extraction to detect clause numbers appearing on separate lines.
+- Improved text cleaning to remove repeated PDF headers.
+- Recovered previously missing DGCA clauses 1.4, 1.5, and 2.6.
+- Increased the number of indexed passages from 71 to 87.
+- Maintained compatibility with the existing agent retrieval interface.
+
+### Verification
+
+- All 16 automated RAG tests passed locally on the merged main branch.
+- Docker integration was verified by the backend integration team.
+- The Docker index contains 87 passages.
+- Relevant DGCA clause IDs were confirmed in the Docker index.
+
+### Limitations
+
+The improved system retrieved 17 out of 29 expected references in the top five results. This indicates that retrieval ranking still misses some relevant clauses.
+
+The 20 evaluation scenarios use preliminary expected clause labels and have not yet undergone independent legal annotation.
+
+Recall@5 and citation matching do not independently establish that generated decisions are faithful, legally correct, or free from hallucinations. These require separate end-to-end evaluation.
