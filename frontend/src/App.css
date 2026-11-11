@@ -1,0 +1,289 @@
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f4f6fa;
+  color: #243047;
+}
+
+header {
+  background: #19345d;
+  color: white;
+  padding: 35px 20px;
+  text-align: center;
+}
+
+header h1 {
+  margin: 0 0 10px;
+}
+
+header p {
+  margin: 0;
+  color: #d9e3f2;
+}
+
+main {
+  max-width: 1000px;
+  margin: 35px auto;
+  padding: 30px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px #00000010;
+}
+
+.intro {
+  margin-bottom: 25px;
+}
+
+.intro h2 {
+  margin-bottom: 8px;
+}
+
+.intro p {
+  color: #69758a;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #cbd3df;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: normal;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid #4475b7;
+  border-color: transparent;
+}
+
+.description {
+  margin-top: 22px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+button {
+  margin-top: 25px;
+  padding: 13px 30px;
+  background: #19345d;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #2d568b;
+}
+
+.secondary-button {
+  background: #52647d;
+}
+
+.secondary-button:hover {
+  background: #40516a;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+footer {
+  text-align: center;
+  padding: 25px;
+  color: #738094;
+  font-size: 13px;
+}
+
+.result-section {
+  margin-top: 30px;
+  padding: 24px;
+  background: #eef3fa;
+  border: 1px solid #d2dce9;
+  border-radius: 10px;
+}
+
+.result-section h2 {
+  margin-top: 0;
+  color: #19345d;
+}
+
+.run-id {
+  overflow-wrap: anywhere;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: bold;
+  margin: 12px 0;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.status-completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-failed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-running {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-queued {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.error-message {
+  color: #b42318;
+  background: #feeceb;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+
+.notice-box {
+  margin-top: 18px;
+  padding: 18px;
+  background: #fff7e6;
+  border: 1px solid #f3d58b;
+  border-radius: 8px;
+}
+
+.notice-box h3 {
+  margin-top: 0;
+}
+
+.decision-panel {
+  margin-top: 22px;
+  padding: 20px;
+  background: white;
+  border: 1px solid #dce4ee;
+  border-radius: 8px;
+}
+
+.recommendation-value {
+  margin: 12px 0;
+  font-size: 20px;
+  font-weight: bold;
+  color: #19345d;
+}
+
+.recommendation-text {
+  line-height: 1.7;
+}
+
+.citation-section {
+  margin-top: 25px;
+}
+
+.citation-item {
+  background: #f4f6fa;
+  padding: 15px;
+  border-left: 4px solid #19345d;
+  margin-bottom: 12px;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+
+.citation-item p {
+  line-height: 1.6;
+}
+
+.feedback-panel {
+  margin-top: 25px;
+  padding: 22px;
+  background: white;
+  border: 1px solid #dce4ee;
+  border-radius: 8px;
+}
+
+.feedback-options {
+  display: flex;
+  gap: 24px;
+  margin: 16px 0;
+}
+
+.feedback-options label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.feedback-options input {
+  width: auto;
+  margin: 0;
+}
+
+.feedback-panel textarea {
+  margin-top: 6px;
+}
+
+.feedback-message {
+  color: #166534;
+  font-weight: bold;
+  margin-top: 15px;
+}
+
+@media (max-width: 650px) {
+  main {
+    margin: 15px;
+    padding: 20px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .result-section {
+    padding: 16px;
+  }
+
+  .decision-panel,
+  .feedback-panel {
+    padding: 15px;
+  }
+
+  .form-actions button {
+    flex: 1;
+  }
+}
