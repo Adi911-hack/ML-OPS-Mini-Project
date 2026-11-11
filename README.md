@@ -3,9 +3,7 @@
 Backend for the claim triage service. It validates claims, quarantines rejected
 requests, queues valid runs, and processes them with scalable workers.
 
-**Current status:** the worker uses a stub agent that makes no entitlement
-decision. The agent, retrieval, frontend, and monitoring modules are not yet
-connected.
+**Current status:** the worker runs the claim analyst and entitlement agents, with retrieval over the DGCA and airline corpus. Routing is not final: every run is currently escalated for human review. The frontend and monitoring are not yet connected.
 
 ## Run the system
 
@@ -15,7 +13,7 @@ You need Docker Desktop with the engine running.
     docker compose up --build
 
 On Windows PowerShell, use `Copy-Item .env.example .env` for the first command.
-Edit the password in `.env` before use. To run three workers:
+Edit the password in `.env` before use, and set `GOOGLE_API_KEY` and `MODEL_NAME`. The first build takes 10 to 20 minutes because it downloads the embedding model and builds the clause index inside the worker image. To run three workers:
 
     docker compose up --build -d --scale agent-worker=3
 
@@ -57,3 +55,4 @@ an exception marks the run as failed.
 ## Documents
 
 Development failures are recorded in `docs/incident-log.md`.
+

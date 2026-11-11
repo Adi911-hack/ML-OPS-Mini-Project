@@ -37,7 +37,10 @@ services:
       retries: 10
 
   api:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: api
     environment: *backend-environment
     ports:
       - "127.0.0.1:8000:8000"
@@ -54,15 +57,18 @@ services:
       start_period: 15s
 
   agent-worker:
-    build: ./backend
-    command: ["python", "-m", "app.worker"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: agents
     restart: unless-stopped
-    environment: *backend-environment
+    environment:
+      <<: *backend-environment
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:?set GOOGLE_API_KEY in .env}
+      MODEL_NAME: ${MODEL_NAME:?set MODEL_NAME in .env}
     depends_on:
       api:
         condition: service_healthy
 
 volumes:
   postgres_data:
-
-

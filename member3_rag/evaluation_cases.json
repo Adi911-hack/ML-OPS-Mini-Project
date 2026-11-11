@@ -1,0 +1,38 @@
+
+[
+  {
+    "id": "EV01",
+    "category": "Flight Delay",
+    "question": "What rights does a passenger have when a domestic flight is delayed by more than six hours?",
+    "expected_source": "dgca_car_section3_series_m_part4.pdf",
+    "expected_clause": "3.4.2"
+  },
+  {
+    "id": "EV02",
+    "category": "Flight Cancellation",
+    "question": "What compensation is available when an airline cancels a flight without sufficient notice?",
+    "expected_source": "dgca_car_section3_series_m_part4.pdf",
+    "expected_clause": "3.3.2"
+  },
+  {
+    "id": "EV03",
+    "category": "Denied Boarding",
+    "question": "What compensation applies when a passenger with a confirmed ticket is denied boarding due to overbooking?",
+    "expected_source": "dgca_car_section3_series_m_part4.pdf",
+    "expected_clause": "3.2.2"
+  },
+  {
+    "id": "EV04",
+    "category": "Downgrading",
+    "question": "How much reimbursement is required when a passenger is involuntarily moved to a lower travel class?",
+    "expected_source": "dgca_car_section3_series_m_part4.pdf",
+    "expected_clause": "3.5.1"
+  },
+  {
+    "id": "EV05",
+    "category": "Extraordinary Circumstances",
+    "question": "What happens when a flight delay is caused by extraordinary circumstances beyond the airline's control?",
+    "expected_source": "dgca_car_section3_series_m_part4.pdf",
+    "expected_clause": "3.4.4"
+  }
+]
