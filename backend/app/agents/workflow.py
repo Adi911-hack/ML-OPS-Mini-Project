@@ -8,6 +8,7 @@ from app.agents.claim_analyst import analyze_claim
 from app.agents.entitlement_agent import evaluate_entitlement
 from app.agents.entitlement_reasoner import review_entitlement
 from app.agents.rag_adapter import search_documents, lookup_clause
+from app.agents.entitlement_agent import safe_escalation
 
 
 tracer = trace.get_tracer(__name__)
@@ -259,12 +260,21 @@ def entitlement_node(state: ClaimState):
                 set_run_id(child, run_id)
                 return lookup_clause(*args, **kwargs)
 
-        entitlement = evaluate_entitlement(
-            state["claim"],
-            state["analysis"],
-            search_function=traced_search,
-            clause_function=traced_clause_lookup
-        )
+        try:
+            entitlement = evaluate_entitlement(
+                state["claim"],
+                state["analysis"],
+                search_function=traced_search,
+                clause_function=traced_clause_lookup
+            )
+        except Exception as error:
+            span.record_exception(error)
+            span.set_attribute("entitlement.fallback", True)
+
+            entitlement = safe_escalation(
+                "Entitlement assessment encountered an unexpected "
+                "model or retrieval failure. Human review is required."
+            )
 
         with tracer.start_as_current_span(
             "citation_verification_result"
