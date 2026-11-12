@@ -1,6 +1,10 @@
 
+from opentelemetry import trace
+
 from app.agents.workflow import run_claim_agents
 
+
+tracer = trace.get_tracer(__name__)
 
 ALLOWED_ROUTES = {
     "pay-as-computed",
@@ -92,77 +96,116 @@ def collect_verified_citations(entitlement, review):
     return citations
 
 
-def run_agents(claim):
-    agent_claim = prepare_agent_claim(claim)
-    workflow_result = run_claim_agents(agent_claim)
+def set_run_id(span, run_id):
+    if run_id is not None:
+        span.set_attribute("run_id", str(run_id))
 
-    analysis = workflow_result["analysis"]
-    entitlement = workflow_result["entitlement"]
 
-    review = entitlement.get("entitlement_review") or {}
-    verification = entitlement.get("citation_verification") or {}
+def run_agents(claim, run_id=None):
+    with tracer.start_as_current_span("agent_runner") as span:
+        set_run_id(span, run_id)
 
-    citations = collect_verified_citations(
-        entitlement,
-        review
-    )
+        with tracer.start_as_current_span("prepare_claim") as child:
+            set_run_id(child, run_id)
+            agent_claim = prepare_agent_claim(claim)
 
-    decision_verified = (
-        review.get("verification_passed") is True
-        and entitlement.get("verification_passed") is True
-        and bool(citations)
-        and verification.get("status") == "passed"
-        and verification.get("rejected_count") == 0
-    )
+        with tracer.start_as_current_span("agent_workflow") as child:
+            set_run_id(child, run_id)
+            if run_id is None:
+                workflow_result = run_claim_agents(agent_claim)
+            else:
+                workflow_result = run_claim_agents(agent_claim, run_id=run_id)
 
-    proposed_route = (
-        review.get("route")
-        or entitlement.get("route")
-        or "request-further-evidence"
-    )
+        analysis = workflow_result["analysis"]
+        entitlement = workflow_result["entitlement"]
 
-    if proposed_route not in ALLOWED_ROUTES:
-        proposed_route = "request-further-evidence"
+        review = entitlement.get("entitlement_review") or {}
+        verification = entitlement.get("citation_verification") or {}
 
-    if (
-        proposed_route in {"pay-as-computed", "decline"}
-        and not decision_verified
-    ):
-        route = "request-further-evidence"
-    else:
-        route = proposed_route
+        with tracer.start_as_current_span("citation_mapping") as child:
+            set_run_id(child, run_id)
 
-    if route == "pay-as-computed":
-        outcome = "routed"
-    elif route == "decline":
-        outcome = "routed"
-    else:
-        outcome = "escalated"
+            citations = collect_verified_citations(
+                entitlement,
+                review
+            )
 
-    reason = (
-        review.get("reasoning")
-        or entitlement.get("reasoning")
-        or "Human review is required."
-    )
+            child.set_attribute(
+                "citations.count",
+                len(citations)
+            )
+            child.set_attribute(
+                "citations.status",
+                str(verification.get("status", "unknown"))
+            )
 
-    escalation_reason = None
+        with tracer.start_as_current_span("decision_routing") as child:
+            set_run_id(child, run_id)
 
-    if outcome == "escalated":
-        escalation_reason = (
-            entitlement.get("escalation_reason")
-            or reason
+            decision_verified = (
+                review.get("verification_passed") is True
+                and entitlement.get("verification_passed") is True
+                and bool(citations)
+                and verification.get("status") == "passed"
+                and verification.get("rejected_count") == 0
+            )
+
+            proposed_route = (
+                review.get("route")
+                or entitlement.get("route")
+                or "request-further-evidence"
+            )
+
+            if proposed_route not in ALLOWED_ROUTES:
+                proposed_route = "request-further-evidence"
+
+            if (
+                proposed_route in {"pay-as-computed", "decline"}
+                and not decision_verified
+            ):
+                route = "request-further-evidence"
+            else:
+                route = proposed_route
+
+            if route in {"pay-as-computed", "decline"}:
+                outcome = "routed"
+            else:
+                outcome = "escalated"
+
+            child.set_attribute("decision.route", route)
+            child.set_attribute("decision.outcome", outcome)
+            child.set_attribute(
+                "decision.verified",
+                decision_verified
+            )
+
+        reason = (
+            review.get("reasoning")
+            or entitlement.get("reasoning")
+            or "Human review is required."
         )
 
-    return {
-        "outcome": outcome,
-        "route": route,
-        "basis": reason,
-        "citations": citations,
-        "verified": decision_verified,
-        "escalation_reason": escalation_reason,
-        "prompt_version": "v1",
-        "analysis": analysis,
-        "entitlement_review": review,
-        "citation_verification": verification,
-        "tool_calls": entitlement.get("tool_calls", [])
-    }
+        escalation_reason = None
+
+        if outcome == "escalated":
+            escalation_reason = (
+                entitlement.get("escalation_reason")
+                or reason
+            )
+
+        span.set_attribute("decision.route", route)
+        span.set_attribute("decision.outcome", outcome)
+
+        return {
+            "outcome": outcome,
+            "route": route,
+            "basis": reason,
+            "citations": citations,
+            "verified": decision_verified,
+            "escalation_reason": escalation_reason,
+            "prompt_version": "v1",
+            "analysis": analysis,
+            "entitlement_review": review,
+            "citation_verification": verification,
+            "tool_calls": entitlement.get("tool_calls", [])
+        }
