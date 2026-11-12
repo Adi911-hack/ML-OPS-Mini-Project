@@ -261,6 +261,22 @@ def run_agents(claim, run_id=None):
             "prompt_version": "v1",
             "analysis": analysis,
             "entitlement_review": review,
+            "monetary_compensation": entitlement.get(
+                "monetary_compensation",
+                {
+                    "status": "undetermined",
+                    "amount_inr": None,
+                    "maximum_cap_inr": None
+                }
+            ),
+            "airport_assistance": entitlement.get(
+                "airport_assistance",
+                {
+                    "status": "not_assessed",
+                    "meals_and_refreshments": "not_assessed",
+                    "hotel_accommodation": "not_assessed"
+                }
+            ),
             "citation_verification": verification,
             "tool_calls": entitlement.get("tool_calls", []),
             "regulatory_scope": scope

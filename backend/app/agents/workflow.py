@@ -154,9 +154,28 @@ def attach_entitlement_review(claim, analysis, entitlement):
             passages
         )
 
+    review = result["entitlement_review"]
     result["route"] = "request-further-evidence"
     result["human_escalation"] = True
     result["verification_passed"] = False
+
+    result["monetary_compensation"] = review.get(
+        "monetary_compensation",
+        {
+            "status": "undetermined",
+            "amount_inr": None,
+            "maximum_cap_inr": None
+        }
+    )
+
+    result["airport_assistance"] = review.get(
+        "airport_assistance",
+        {
+            "status": "not_assessed",
+            "meals_and_refreshments": "not_assessed",
+            "hotel_accommodation": "not_assessed"
+        }
+    )
 
     return result
 
