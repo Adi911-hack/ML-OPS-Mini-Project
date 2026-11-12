@@ -100,7 +100,9 @@ def test_agent_spans_share_worker_trace(monkeypatch):
             {
                 "description": "My flight was cancelled.",
                 "reported_disruption": "cancellation",
-                "airline": "IndiGo"
+                "airline": "IndiGo",
+                "origin": "BLR",
+                "destination": "DEL",
             },
             run_id=run_id
         )

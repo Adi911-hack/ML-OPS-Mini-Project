@@ -155,10 +155,7 @@ def run_agents(claim, run_id=None):
             scope = check_regulatory_scope(agent_claim)
             child.set_attribute("scope.status", scope["status"])
 
-        if (
-            agent_claim.get("origin") is not None
-            or agent_claim.get("destination") is not None
-        ) and scope["status"] != "supported":
+        if scope["status"] != "supported":
             span.set_attribute("decision.outcome", "escalated")
             span.set_attribute(
                 "decision.route",

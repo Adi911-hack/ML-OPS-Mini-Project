@@ -6,7 +6,9 @@ from app.agent_runner import run_agents
 
 CLAIM = {
     "description": "My flight was cancelled.",
-    "reported_disruption": "cancellation"
+    "reported_disruption": "cancellation",
+    "origin": "BLR",
+    "destination": "DEL",
 }
 
 

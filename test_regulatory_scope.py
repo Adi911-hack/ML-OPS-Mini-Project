@@ -99,3 +99,26 @@ def test_unknown_route_never_calls_agents(monkeypatch):
     assert result["outcome"] == "escalated"
     assert result["verified"] is False
     assert result["regulatory_scope"]["status"] == "unknown"
+
+def test_both_airports_missing_never_calls_agents(monkeypatch):
+    def unexpected_workflow(*args, **kwargs):
+        raise AssertionError(
+            "Missing route reached agent workflow"
+        )
+
+    monkeypatch.setattr(
+        agent_runner,
+        "run_claim_agents",
+        unexpected_workflow
+    )
+
+    result = agent_runner.run_agents({
+        "description": "My flight was cancelled.",
+        "reported_disruption": "cancellation"
+    })
+
+    assert result["outcome"] == "escalated"
+    assert result["route"] == "request-further-evidence"
+    assert result["verified"] is False
+    assert result["citations"] == []
+    assert result["regulatory_scope"]["status"] == "unknown"
