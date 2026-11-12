@@ -191,6 +191,39 @@ def analyst_node(state: ClaimState):
 
 def entitlement_node(state: ClaimState):
     run_id = state.get("run_id")
+    analysis = state["analysis"]
+
+    if "claim_analysis_unavailable" in (
+        analysis.get("missing_fields") or []
+    ):
+        reason = (
+            "Claim Analyst unavailable after model retries. "
+            "Human review is required before entitlement assessment."
+        )
+
+        return {
+            "entitlement": {
+                "route": "request-further-evidence",
+                "reasoning": reason,
+                "escalation_reason": reason,
+                "human_escalation": True,
+                "verification_passed": False,
+                "retrieved_passages": [],
+                "citation_verification": {
+                    "status": "not_run",
+                    "verified_count": 0,
+                    "rejected_count": 0
+                },
+                "tool_calls": [],
+                "entitlement_review": {
+                    "route": "request-further-evidence",
+                    "reasoning": reason,
+                    "supporting_clause_ids": [],
+                    "human_escalation": True,
+                    "verification_passed": False
+                }
+            }
+        }
 
     with tracer.start_as_current_span("entitlement_agent") as span:
         set_run_id(span, run_id)
