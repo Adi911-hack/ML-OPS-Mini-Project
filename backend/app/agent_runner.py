@@ -2,6 +2,7 @@
 from opentelemetry import trace
 
 from app.agents.workflow import run_claim_agents
+from app.agents.regulatory_scope import check_regulatory_scope
 
 
 tracer = trace.get_tracer(__name__)
@@ -101,6 +102,45 @@ def set_run_id(span, run_id):
         span.set_attribute("run_id", str(run_id))
 
 
+def scope_escalation(scope):
+    reason = scope["reason"]
+
+    return {
+        "outcome": "escalated",
+        "route": "request-further-evidence",
+        "basis": reason,
+        "citations": [],
+        "verified": False,
+        "escalation_reason": reason,
+        "prompt_version": "v1",
+        "analysis": {
+            "disruption_type": "unknown",
+            "missing_fields": ["regulatory_scope_verification"],
+            "contradictions": [],
+            "explanation": reason
+        },
+        "entitlement_review": {
+            "route": "request-further-evidence",
+            "recommendation": "Human jurisdiction review required",
+            "reasoning": reason,
+            "conditions": [],
+            "missing_information": [
+                "regulatory_scope_verification"
+            ],
+            "supporting_clause_ids": [],
+            "human_escalation": True,
+            "verification_passed": False
+        },
+        "citation_verification": {
+            "status": "not_run",
+            "verified_count": 0,
+            "rejected_count": 0
+        },
+        "tool_calls": [],
+        "regulatory_scope": scope
+    }
+
+
 def run_agents(claim, run_id=None):
     with tracer.start_as_current_span("agent_runner") as span:
         set_run_id(span, run_id)
@@ -109,12 +149,33 @@ def run_agents(claim, run_id=None):
             set_run_id(child, run_id)
             agent_claim = prepare_agent_claim(claim)
 
+        with tracer.start_as_current_span("regulatory_scope") as child:
+            set_run_id(child, run_id)
+
+            scope = check_regulatory_scope(agent_claim)
+            child.set_attribute("scope.status", scope["status"])
+
+        if (
+            agent_claim.get("origin") is not None
+            or agent_claim.get("destination") is not None
+        ) and scope["status"] != "supported":
+            span.set_attribute("decision.outcome", "escalated")
+            span.set_attribute(
+                "decision.route",
+                "request-further-evidence"
+            )
+            return scope_escalation(scope)
+
         with tracer.start_as_current_span("agent_workflow") as child:
             set_run_id(child, run_id)
+
             if run_id is None:
                 workflow_result = run_claim_agents(agent_claim)
             else:
-                workflow_result = run_claim_agents(agent_claim, run_id=run_id)
+                workflow_result = run_claim_agents(
+                    agent_claim,
+                    run_id=run_id
+                )
 
         analysis = workflow_result["analysis"]
         entitlement = workflow_result["entitlement"]
@@ -130,10 +191,7 @@ def run_agents(claim, run_id=None):
                 review
             )
 
-            child.set_attribute(
-                "citations.count",
-                len(citations)
-            )
+            child.set_attribute("citations.count", len(citations))
             child.set_attribute(
                 "citations.status",
                 str(verification.get("status", "unknown"))
@@ -207,5 +265,6 @@ def run_agents(claim, run_id=None):
             "analysis": analysis,
             "entitlement_review": review,
             "citation_verification": verification,
-            "tool_calls": entitlement.get("tool_calls", [])
+            "tool_calls": entitlement.get("tool_calls", []),
+            "regulatory_scope": scope
         }
