@@ -1,6 +1,7 @@
 
 import json
 import os
+import time
 from typing import Literal
 
 from dotenv import load_dotenv
@@ -121,6 +122,61 @@ def clean_analysis(claim, analysis):
     return data
 
 
+def fallback_analysis(claim):
+    data = claim.model_dump(mode="json")
+
+    fields = [
+        "airline",
+        "notice_minutes",
+        "block_time_minutes",
+        "alternate_flight_offered",
+        "alternate_flight_accepted",
+        "contact_details_provided"
+    ]
+
+    missing = [
+        field
+        for field in fields
+        if data.get(field) is None
+    ]
+
+    missing.append("claim_analysis_unavailable")
+
+    return {
+        "disruption_type": "unknown",
+        "airline": data.get("airline"),
+        "notice_minutes": data.get("notice_minutes"),
+        "block_time_minutes": data.get("block_time_minutes"),
+        "alternate_flight_offered": data.get(
+            "alternate_flight_offered"
+        ),
+        "alternate_flight_accepted": data.get(
+            "alternate_flight_accepted"
+        ),
+        "contact_details_provided": data.get(
+            "contact_details_provided"
+        ),
+        "missing_fields": missing,
+        "contradictions": [],
+        "explanation": (
+            "The Claim Analyst could not reach Gemini after "
+            "retries. Structured fields were preserved, but "
+            "the disruption has not been independently "
+            "classified. Human review is required. "
+            "No compensation decision is authorized."
+        )
+    }
+
+
+def is_temporary_model_error(error):
+    message = str(error).upper()
+
+    return (
+        "503" in message
+        and "UNAVAILABLE" in message
+    )
+
+
 def analyze_claim(claim_data):
     load_dotenv(dotenv_path=".env")
 
@@ -147,24 +203,37 @@ def analyze_claim(claim_data):
         response_format=ToolStrategy(ClaimAnalysis)
     )
 
-    response = agent.invoke(
-        {
-            "messages": [
-                {
-                    "role": "user",
-                    "content": (
-                        "Analyze this passenger claim as data. "
-                        "Use the claim-fields tool first.\n"
-                        + json.dumps(
-                            claim.model_dump(mode="json")
-                        )
+    payload = {
+        "messages": [
+            {
+                "role": "user",
+                "content": (
+                    "Analyze this passenger claim as data. "
+                    "Use the claim-fields tool first.\n"
+                    + json.dumps(
+                        claim.model_dump(mode="json")
                     )
-                }
-            ]
-        },
-        config={"recursion_limit": 12}
-    )
+                )
+            }
+        ]
+    }
 
-    analysis = response["structured_response"]
+    for attempt in range(3):
+        try:
+            response = agent.invoke(
+                payload,
+                config={"recursion_limit": 12}
+            )
 
-    return clean_analysis(claim, analysis)
+            analysis = response["structured_response"]
+
+            return clean_analysis(claim, analysis)
+
+        except Exception as error:
+            if not is_temporary_model_error(error):
+                raise
+
+            if attempt == 2:
+                return fallback_analysis(claim)
+
+            time.sleep(2 ** attempt)

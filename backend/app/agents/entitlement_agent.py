@@ -403,7 +403,10 @@ def evaluate_entitlement(
     api_key = os.getenv("GOOGLE_API_KEY")
 
     if not model_name or not api_key:
-        raise RuntimeError("Missing Gemini configuration in .env")
+        return safe_escalation(
+            "Gemini configuration is unavailable. "
+            "Human review is required before entitlement assessment."
+        )
 
     model = ChatGoogleGenerativeAI(
         model=model_name,
