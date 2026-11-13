@@ -98,39 +98,51 @@ Returns status.
 
 ## Agent function
 
-The worker calls `run_agents(claim)` in `backend/app/agent_runner.py`. It receives
-the validated claim as a dictionary and must return a JSON-serialisable dictionary.
-Raising an exception marks the run as failed.
+The worker calls `run_agents(claim, run_id=None)` in `backend/app/agent_runner.py`.
+It receives the validated claim as a dictionary, and the run ID for tracing. It
+returns a JSON-serialisable dictionary. Raising an exception marks the run as
+failed.
 
-## Proposed: agent result
+## Agent result
 
-**Status: proposal, to be agreed by the agent and retrieval owners. Not yet enforced
-by the code.**
+Stored in `result` on `GET /runs/{run_id}` when the status is `completed`.
 
-    {
-      "outcome": "routed or escalated",
-      "route": "pay-as-computed, request-further-evidence, decline, or null",
-      "basis": "Explanation of the entitlement position",
-      "citations": [
-        {
-          "document": "Source document name",
-          "clause_id": "Clause identifier",
-          "page": 1,
-          "text": "Exact retrieved passage"
-        }
-      ],
-      "verified": true,
-      "escalation_reason": null,
-      "prompt_version": "Prompt version identifier"
-    }
+| Field | Meaning |
+|---|---|
+| outcome | `routed` or `escalated` |
+| route | `pay-as-computed`, `request-further-evidence`, or `decline` |
+| basis | Explanation of the entitlement position |
+| citations | Verified supporting passages: document, clause_id, page, text |
+| verified | True only if every cited passage matched the indexed clause |
+| escalation_reason | Why a human must review, when escalated |
+| prompt_version | Prompt version used for the run |
+| monetary_compensation | Compensation status, amount and cap where assessed |
+| airport_assistance | Meals, refreshments and accommodation status |
+| regulatory_scope | Whether the route falls within the DGCA corpus |
+| citation_verification | Verified and rejected passage counts |
+| tool_calls | Tools the agents called during the run |
+| analysis, entitlement_review | Intermediate agent outputs |
+
+Citations are only returned when every retrieved passage passed verification. A
+route outside the supplied corpus is escalated rather than answered.
 
 The system never authorises a payment. The route is a recommendation for a customer
 relations officer.
 
-## Proposed: retrieval tools
+## Retrieval tools
 
-**Status: proposal, to be agreed by the agent and retrieval owners.**
+Defined in `member3_rag/rag_interface.py` and wrapped as agent tools in
+`backend/app/agents/tools.py`:
 
-    search_corpus(query: str, top_k: int) -> list[citation]
-    get_clause_by_id(clause_id: str) -> citation or None
-    get_claim_fields(run_id: str) -> dict
+    search_corpus(query: str, top_k: int = 5) -> list[dict]
+    get_clause_by_id(clause_id: str) -> dict | None
+    get_claim_fields(field_names: list[str]) -> str
+
+Each passage has clause_id, source, page, and text. Clause IDs use the form
+`DGCA:3.3.2`.
+
+## Tracing
+
+Each run is one OpenTelemetry trace across the API and worker, exported to Jaeger.
+Search Jaeger by the attribute `run_id=<run id>`. Worker log lines include
+`run_id` and `trace_id`.
