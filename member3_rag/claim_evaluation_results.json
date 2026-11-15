@@ -1,5 +1,5 @@
 {
-  "total_scenarios": 20,
+  "total_scenarios": 21,
   "scenarios_with_expected_clauses": 19,
   "expected_clause_references": 29,
   "retrieved_clause_references": 17,
@@ -496,6 +496,25 @@
       "all_expected_found": false,
       "expected_outcome": "Request evidence before determining entitlement",
       "expected_route": "request_further_evidence"
+    },
+    {
+      "id": "SC21",
+      "category": "out_of_scope",
+      "claim": "My flight from Paris to Berlin was cancelled. I want to claim compensation under EU Regulation EC 261/2004. What compensation am I entitled to?",
+      "expected_clauses": [],
+      "retrieved_clauses": [
+        "DGCA:3.3.4",
+        "MOCA:P11",
+        "DGCA:1.4",
+        "DGCA:3.6.1",
+        "DGCA:3.7.1"
+      ],
+      "found_clauses": [],
+      "missing_references": [],
+      "ranks": {},
+      "all_expected_found": null,
+      "expected_outcome": "EU passenger compensation rules are outside the available Indian DGCA and airline regulation corpus. Do not invent EU compensation amounts or cite Indian regulations as applicable.",
+      "expected_route": "human_escalation"
     }
   ]
 }
