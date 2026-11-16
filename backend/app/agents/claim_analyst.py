@@ -11,6 +11,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
 from app.agents.tools import create_claim_tools
+from app.agents.reliability import CircuitBreaker, CircuitOpenError
 
 
 class PassengerClaim(BaseModel):
@@ -177,9 +178,14 @@ def is_temporary_model_error(error):
     )
 
 
+CLAIM_GEMINI_BREAKER = CircuitBreaker(
+    failure_threshold=3,
+    recovery_timeout=30
+)
+
+
 def analyze_claim(claim_data):
     load_dotenv(dotenv_path=".env")
-
     claim = PassengerClaim.model_validate(claim_data)
 
     model_name = os.getenv("MODEL_NAME")
@@ -220,7 +226,8 @@ def analyze_claim(claim_data):
 
     for attempt in range(3):
         try:
-            response = agent.invoke(
+            response = CLAIM_GEMINI_BREAKER.call(
+                agent.invoke,
                 payload,
                 config={"recursion_limit": 12}
             )
@@ -228,6 +235,9 @@ def analyze_claim(claim_data):
             analysis = response["structured_response"]
 
             return clean_analysis(claim, analysis)
+
+        except CircuitOpenError:
+            return fallback_analysis(claim)
 
         except Exception as error:
             if not is_temporary_model_error(error):

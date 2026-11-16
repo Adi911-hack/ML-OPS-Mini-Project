@@ -1,5 +1,6 @@
 
 from typing import TypedDict
+from unittest import result
 
 from langgraph.graph import StateGraph, START, END
 from opentelemetry import trace
@@ -15,10 +16,13 @@ tracer = trace.get_tracer(__name__)
 
 
 class ClaimState(TypedDict, total=False):
+
     claim: dict
     analysis: dict
     entitlement: dict
     run_id: str | None
+    prompt_version: str | None
+    eligibility_review: dict | None
 
 
 def set_run_id(span, run_id):
@@ -38,7 +42,10 @@ def normalize_claim_analysis(claim, analysis):
         "block_time_minutes",
         "alternate_flight_offered",
         "alternate_flight_accepted",
-        "contact_details_provided"
+        "contact_details_provided",
+        "booked_one_way_basic_fare",
+        "airline_fuel_charge",
+        "cancellation_cause"
     ]
 
     for field in fields:
@@ -114,7 +121,12 @@ def normalize_claim_analysis(claim, analysis):
     return analysis
 
 
-def attach_entitlement_review(claim, analysis, entitlement):
+def attach_entitlement_review(
+    claim,
+    analysis,
+    entitlement,
+    eligibility_review=None
+):
     result = dict(entitlement)
 
     verification = result.get("citation_verification") or {}
@@ -149,16 +161,34 @@ def attach_entitlement_review(claim, analysis, entitlement):
             flush=True
         )
 
+        review_kwargs = {}
+
+        if eligibility_review is not None:
+            review_kwargs["eligibility_review"] = eligibility_review
+
         result["entitlement_review"] = review_entitlement(
             claim,
             analysis,
-            passages
+            passages,
+            **review_kwargs
         )
 
     review = result["entitlement_review"]
-    result["route"] = "request-further-evidence"
-    result["human_escalation"] = True
-    result["verification_passed"] = False
+
+    result["route"] = review.get(
+        "route",
+        "request-further-evidence"
+    )
+
+    result["verification_passed"] = (
+        verified
+        and review.get("verification_passed") is True
+    )
+
+    result["human_escalation"] = (
+        not result["verification_passed"]
+        or review.get("human_escalation", True)
+    )
 
     result["monetary_compensation"] = review.get(
         "monetary_compensation",
@@ -261,12 +291,22 @@ def entitlement_node(state: ClaimState):
                 return lookup_clause(*args, **kwargs)
 
         try:
+            entitlement_kwargs = {
+            "search_function": traced_search,
+            "clause_function": traced_clause_lookup
+        }
+
+            prompt_version = state.get("prompt_version")
+
+            if prompt_version is not None:
+                entitlement_kwargs["prompt_version"] = prompt_version
+
             entitlement = evaluate_entitlement(
                 state["claim"],
                 state["analysis"],
-                search_function=traced_search,
-                clause_function=traced_clause_lookup
-            )
+                **entitlement_kwargs
+        )
+
         except Exception as error:
             span.record_exception(error)
             span.set_attribute("entitlement.fallback", True)
@@ -305,10 +345,20 @@ def entitlement_node(state: ClaimState):
         ) as child:
             set_run_id(child, run_id)
 
-            entitlement = attach_entitlement_review(
-                state["claim"],
-                state["analysis"],
-                entitlement
+            eligibility_review = state.get("eligibility_review")
+
+            if eligibility_review is None:
+                entitlement = attach_entitlement_review(
+                    state["claim"],
+                    state["analysis"],
+                    entitlement
+            )
+            else:
+                entitlement = attach_entitlement_review(
+                    state["claim"],
+                    state["analysis"],
+                    entitlement,
+                    eligibility_review=eligibility_review
             )
 
             review = entitlement.get("entitlement_review") or {}
@@ -339,13 +389,20 @@ def create_workflow():
     return graph.compile()
 
 
-def run_claim_agents(claim, run_id=None):
+def run_claim_agents(
+    claim,
+    run_id=None,
+    prompt_version=None,
+    eligibility_review=None
+):
     workflow = create_workflow()
 
     result = workflow.invoke(
         {
             "claim": claim,
-            "run_id": run_id
+            "run_id": run_id,
+            "prompt_version": prompt_version,
+            "eligibility_review": eligibility_review
         },
         config={"recursion_limit": 24}
     )

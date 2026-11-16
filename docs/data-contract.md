@@ -32,6 +32,8 @@ further evidence is needed.
 | alternate_flight_accepted | boolean | |
 | alternate_departure | datetime | ISO 8601 with a timezone |
 | contact_details_provided | boolean | |
+| booked_one_way_basic_fare | number or null | Booked one-way basic fare in INR; must be non-negative |
+| airline_fuel_charge | number or null | Airline fuel charge in INR; must be non-negative |
 
 ### Cross-field rules
 

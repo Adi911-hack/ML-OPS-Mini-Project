@@ -3,6 +3,14 @@ from opentelemetry import trace
 
 from app.agents.workflow import run_claim_agents
 from app.agents.regulatory_scope import check_regulatory_scope
+from app.agents.guardrails import (
+    check_claim_input,
+    validate_agent_output
+)
+from app.agents.entitlement_agent import (
+    DEFAULT_PROMPT_VERSION,
+    get_entitlement_prompt
+)
 
 
 tracer = trace.get_tracer(__name__)
@@ -102,7 +110,10 @@ def set_run_id(span, run_id):
         span.set_attribute("run_id", str(run_id))
 
 
-def scope_escalation(scope):
+def scope_escalation(
+    scope,
+    prompt_version=DEFAULT_PROMPT_VERSION
+):
     reason = scope["reason"]
 
     return {
@@ -112,7 +123,7 @@ def scope_escalation(scope):
         "citations": [],
         "verified": False,
         "escalation_reason": reason,
-        "prompt_version": "v1",
+        "prompt_version": prompt_version,
         "analysis": {
             "disruption_type": "unknown",
             "missing_fields": ["regulatory_scope_verification"],
@@ -141,13 +152,51 @@ def scope_escalation(scope):
     }
 
 
-def run_agents(claim, run_id=None):
+def run_agents(
+    claim,
+    run_id=None,
+    prompt_version=DEFAULT_PROMPT_VERSION
+):
+    get_entitlement_prompt(prompt_version)
     with tracer.start_as_current_span("agent_runner") as span:
         set_run_id(span, run_id)
 
         with tracer.start_as_current_span("prepare_claim") as child:
             set_run_id(child, run_id)
             agent_claim = prepare_agent_claim(claim)
+        with tracer.start_as_current_span("input_guardrails") as child:
+            set_run_id(child, run_id)
+
+            guardrail_result = check_claim_input(agent_claim)
+
+            child.set_attribute(
+                "guardrails.prompt_injection_detected",
+                guardrail_result["prompt_injection_detected"]
+            )
+
+            child.set_attribute(
+                "guardrails.toxicity_detected",
+                guardrail_result["toxicity_detected"]
+            )
+
+            if any(guardrail_result.values()):
+                reason = (
+                    "The claim requires human review because "
+                    "the input safety checks detected suspicious "
+                    "or threatening content."
+                )
+
+                result = scope_escalation(
+                    {
+                        "status": "not_assessed",
+                        "reason": reason
+                    },
+                    prompt_version=prompt_version
+                )
+
+                result["guardrail_flags"] = guardrail_result
+
+                return result
 
         with tracer.start_as_current_span("regulatory_scope") as child:
             set_run_id(child, run_id)
@@ -161,17 +210,37 @@ def run_agents(claim, run_id=None):
                 "decision.route",
                 "request-further-evidence"
             )
-            return scope_escalation(scope)
+            return scope_escalation(
+                scope,
+                prompt_version=prompt_version
+            )
 
         with tracer.start_as_current_span("agent_workflow") as child:
             set_run_id(child, run_id)
 
-            if run_id is None:
+            if (
+                run_id is None
+                and prompt_version == DEFAULT_PROMPT_VERSION
+            ):
                 workflow_result = run_claim_agents(agent_claim)
-            else:
+
+            elif prompt_version == DEFAULT_PROMPT_VERSION:
                 workflow_result = run_claim_agents(
                     agent_claim,
                     run_id=run_id
+                )
+
+            elif run_id is None:
+                workflow_result = run_claim_agents(
+                    agent_claim,
+                    prompt_version=prompt_version
+                )
+
+            else:
+                workflow_result = run_claim_agents(
+                    agent_claim,
+                    run_id=run_id,
+                    prompt_version=prompt_version
                 )
 
         analysis = workflow_result["analysis"]
@@ -251,14 +320,14 @@ def run_agents(claim, run_id=None):
         span.set_attribute("decision.route", route)
         span.set_attribute("decision.outcome", outcome)
 
-        return {
+        response= {
             "outcome": outcome,
             "route": route,
             "basis": reason,
             "citations": citations,
             "verified": decision_verified,
             "escalation_reason": escalation_reason,
-            "prompt_version": "v1",
+            "prompt_version": prompt_version,
             "analysis": analysis,
             "entitlement_review": review,
             "monetary_compensation": entitlement.get(
@@ -281,3 +350,30 @@ def run_agents(claim, run_id=None):
             "tool_calls": entitlement.get("tool_calls", []),
             "regulatory_scope": scope
         }
+        with tracer.start_as_current_span("output_guardrails") as child:
+            set_run_id(child, run_id)
+
+            output_valid = validate_agent_output(response)
+
+            child.set_attribute(
+                "guardrails.output_valid",
+                output_valid
+            )
+
+            if not output_valid:
+                response["outcome"] = "escalated"
+                response["route"] = "request-further-evidence"
+                response["verified"] = False
+                response["basis"] = (
+                    "Agent output failed safety validation. "
+                    "Human review is required."
+                )
+                response["escalation_reason"] = response["basis"]
+
+                response["monetary_compensation"] = {
+                    "status": "undetermined",
+                    "amount_inr": None,
+                    "maximum_cap_inr": None
+                }
+
+        return response

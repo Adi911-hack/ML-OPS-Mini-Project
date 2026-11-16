@@ -30,8 +30,39 @@ def compensation_cap(block_time):
 
     return 10000
 
+def calculate_compensation(block_time, basic_fare, fuel_charge):
+    import math
 
-def review_entitlement(claim, analysis, verified_passages):
+    cap = compensation_cap(block_time)
+
+    if cap is None:
+        return None
+
+    for value in (basic_fare, fuel_charge):
+        if isinstance(value, bool):
+            return None
+
+        if not isinstance(value, (int, float)):
+            return None
+
+        if not math.isfinite(value) or value < 0:
+            return None
+
+    amount = basic_fare + fuel_charge
+
+    if not math.isfinite(amount):
+        return None
+
+    return round(min(cap, amount), 2)
+
+
+
+def review_entitlement(
+    claim,
+    analysis,
+    verified_passages,
+    eligibility_review=None
+):
     result = {
         "route": "request-further-evidence",
         "recommendation": "Human review required",
@@ -94,6 +125,14 @@ def review_entitlement(claim, analysis, verified_passages):
     notice = analysis.get("notice_minutes")
     block_time = analysis.get("block_time_minutes")
     contact = analysis.get("contact_details_provided")
+    basic_fare = analysis.get("booked_one_way_basic_fare")
+    fuel_charge = analysis.get("airline_fuel_charge")
+
+    calculated_amount = calculate_compensation(
+        block_time,
+        basic_fare,
+        fuel_charge
+    )
     alternate_offered = analysis.get("alternate_flight_offered")
     alternate_accepted = analysis.get("alternate_flight_accepted")
 
@@ -145,6 +184,7 @@ def review_entitlement(claim, analysis, verified_passages):
     cap = compensation_cap(block_time)
 
     result["monetary_compensation"]["maximum_cap_inr"] = cap
+    result["monetary_compensation"]["potential_amount_inr"] = calculated_amount
 
     conditions.append({
         "name": "flight_block_time",
@@ -200,6 +240,18 @@ def review_entitlement(claim, analysis, verified_passages):
         result["missing_information"] = list(dict.fromkeys(missing))
         return result
 
+    cause = analysis.get("cancellation_cause")
+
+    if cause in {"extraordinary", "disputed"}:
+        result["reasoning"] = (
+            "The cancellation cause is reported as extraordinary "
+            "or disputed. Human review is required before "
+            "an entitlement recommendation can be made."
+        )
+        result["missing_information"] = list(dict.fromkeys(
+            missing + ["cancellation_cause_review"]
+        ))
+        return result
     monetary = result["monetary_compensation"]
 
     if contact is False:
@@ -242,11 +294,15 @@ def review_entitlement(claim, analysis, verified_passages):
             "subject to alternative travel, fare evidence "
             "and extraordinary-circumstance checks."
         )
-        missing.extend([
-            "booked_one_way_basic_fare",
-            "airline_fuel_charge",
+        if basic_fare is None:
+            missing.append("booked_one_way_basic_fare")
+
+        if fuel_charge is None:
+            missing.append("airline_fuel_charge")
+
+        missing.append(
             "confirmed_alternate_travel_or_refund_choice"
-        ])
+        )
 
     elif notice_valid and notice >= 1440:
         monetary["status"] = "alternate_or_refund_review"
@@ -263,6 +319,101 @@ def review_entitlement(claim, analysis, verified_passages):
             "The available information is insufficient "
             "for a reliable monetary compensation assessment."
         )
+
+    if (
+        alternate_offered is True
+        and alternate_accepted is True
+        and contact is True
+        and notice_valid
+        and block_valid
+        and not analysis.get("contradictions")
+    ):
+        monetary["status"] = "not_payable"
+        monetary["amount_inr"] = 0
+
+        result["route"] = "decline"
+        result["recommendation"] = (
+            "No monetary compensation payable under "
+            "the accepted alternate-flight option."
+        )
+
+        result["reasoning"] = (
+            "The passenger reports accepting an alternate flight "
+            "after cancellation. Under DGCA 3.3.2, monetary "
+            "compensation is not payable under this option. "
+            "Meals and refreshments must be provided under "
+            "the applicable facilities provision when the "
+            "passenger has reported to the airport and is "
+            "waiting for alternate travel. Accommodation may "
+            "also apply when necessary. The customer relations "
+            "officer makes the final determination."
+        )
+
+        result["supporting_clause_ids"] = [
+            "DGCA:3.3.2",
+            "DGCA:3.8.1"
+        ]
+
+        result["verification_passed"] = True
+        result["human_escalation"] = False
+
+        result["missing_information"] = [
+            item for item in dict.fromkeys(missing)
+            if item == "airport_reporting_and_waiting_details"
+        ]
+
+        return result
+
+
+
+    if (
+        notice_valid
+        and notice < 1440
+        and contact is True
+        and alternate_offered is False
+        and alternate_accepted is False
+        and block_valid
+        and calculated_amount is not None
+        and calculated_amount > 0
+        and analysis.get("cancellation_cause") == "ordinary"
+        and not analysis.get("contradictions")
+    ):
+        monetary["status"] = "payable"
+        monetary["amount_inr"] = calculated_amount
+
+        result["route"] = "pay-as-computed"
+        result["recommendation"] = (
+            "Recommend compensation based on passenger-reported "
+            "facts and verified DGCA citations. Final decision "
+            "requires customer relations officer review."
+        )
+
+        result["reasoning"] = (
+            "The passenger reports cancellation with less than "
+            "24 hours notice, no alternate flight offered, and "
+            "an ordinary cancellation cause. Based on the "
+            "reported facts and verified DGCA citations, "
+            "compensation is recommended under DGCA 3.3.2. "
+            "This is not payment authorization; a customer "
+            "relations officer makes the final decision."
+        )
+
+        result["supporting_clause_ids"] = [
+            "DGCA:3.3.1",
+            "DGCA:3.3.2",
+            "DGCA:3.3.3",
+            "DGCA:3.3.4"
+        ]
+
+        result["verification_passed"] = True
+        result["human_escalation"] = False
+
+        result["missing_information"] = [
+            item for item in dict.fromkeys(missing)
+            if item == "airport_reporting_and_waiting_details"
+        ]
+
+        return result
 
     result["recommendation"] = (
         "Request missing evidence and complete human review"
