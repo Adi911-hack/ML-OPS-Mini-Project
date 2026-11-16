@@ -404,3 +404,54 @@ The exception-aware prompt demonstrated better expected-clause retrieval recall 
 The evaluation also identified limitations in automated entitlement reasoning and intermittent Gemini service availability.
 
 These results provide preliminary evidence of improved retrieval coverage, but not a verified improvement in final compensation decisions.
+## L2/L3 Human-Annotated Evaluation Metrics
+
+### Evaluation Scope
+
+The evaluation dataset contains 21 scenarios. Of these, 11 produced valid, non-fallback results for both prompt versions.
+
+Gemini fallback runs were excluded from the direct comparison.
+
+### Four-Metric Evaluation
+
+| Metric | v1-basic | v2-exception-aware |
+|---|---|---|
+| Context relevance (expected-clause proxy) | 14.97% | 14.00% |
+| Groundedness (reviewed claims only) | 100% | 100% |
+| Faithfulness (reviewed claims only) | 100% | 100% |
+| Hallucination rate (reviewed claims only) | 0% | 0% |
+
+Context relevance was estimated using the proportion of retrieved passages whose clause IDs matched the assignment's expected clauses, averaged across 11 paired scenarios.
+
+Factual-claim annotations covered:
+- v1-basic: 2 of 11 paired scenarios, containing 6 reviewed factual claims.
+- v2-exception-aware: 1 of 11 paired scenarios, containing 3 reviewed factual claims.
+
+The factual-support metrics therefore apply only to these reviewed claims. They are not representative scores for the complete evaluation dataset.
+
+Generic escalation responses without substantive regulatory assertions were not assigned fabricated factual-claim labels.
+
+### Retrieval Comparison
+
+| Metric | v1-basic | v2-exception-aware |
+|---|---|---|
+| Expected clauses retrieved | 11/16 | 12/16 |
+| Expected-clause recall | 68.75% | 75.00% |
+
+The exception-aware prompt retrieved one additional expected clause. This represents a small observed improvement, not a proven improvement in overall agent accuracy.
+
+### Limitations
+
+1. Only 11 of 21 scenarios had valid paired results.
+2. The factual-claim metrics cover a limited reviewed subset.
+3. The context relevance figures are expected-clause matching proxies, not complete expert relevance annotations.
+4. Several scenarios produced human-escalation responses instead of final entitlement decisions.
+5. Full human annotation remains necessary before reporting definitive L2/L3 performance.
+
+### Conclusion
+
+Both prompt variants successfully retrieved regulatory evidence.
+
+The exception-aware version demonstrated slightly higher expected-clause recall, while the limited human-reviewed factual claims were supported by the available evidence.
+
+The findings are preliminary and do not establish superior overall entitlement decision accuracy.
