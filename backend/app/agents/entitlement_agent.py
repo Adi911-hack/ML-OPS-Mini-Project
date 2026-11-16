@@ -99,7 +99,8 @@ def safe_escalation(
     reason,
     tool_calls=None,
     evidence=None,
-    citation_verification=None
+    citation_verification=None,
+    used_fallback=False
 ):
     return {
         "route": "request-further-evidence",
@@ -113,6 +114,7 @@ def safe_escalation(
         "escalation_reason": reason,
         "tool_calls": tool_calls or [],
         "retrieved_passages": evidence or [],
+        "used_fallback": used_fallback,
         "citation_verification": citation_verification or {
             "status": "not_run",
             "verified_count": 0,
@@ -420,7 +422,8 @@ def finalize_research(
         reason,
         tool_calls,
         verified_evidence,
-        verification_summary
+        verification_summary,
+        used_fallback=used_fallback
     )
 
 
