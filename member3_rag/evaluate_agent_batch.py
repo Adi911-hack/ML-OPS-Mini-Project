@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import inspect
 import json
 import sys
@@ -16,6 +17,29 @@ PROMPT_VERSIONS = [
     "v1-basic",
     "v2-exception-aware"
 ]
+
+ROUTES = {
+    "SC01": ("BLR", "DEL"),
+    "SC02": ("BLR", "DEL"),
+    "SC03": ("BLR", "DEL"),
+    "SC04": ("BLR", "DEL"),
+    "SC05": ("BLR", "DEL"),
+    "SC06": ("BLR", "DEL"),
+    "SC07": ("BLR", "DEL"),
+    "SC08": ("BLR", "DEL"),
+    "SC09": ("BLR", "DEL"),
+    "SC10": ("BLR", "DEL"),
+    "SC11": ("BLR", "DEL"),
+    "SC12": ("BLR", "DEL"),
+    "SC13": ("BLR", "DEL"),
+    "SC14": ("BLR", "DXB"),
+    "SC15": ("BLR", "DEL"),
+    "SC16": ("BLR", "DEL"),
+    "SC17": ("BLR", "DEL"),
+    "SC18": ("BLR", "DEL"),
+    "SC20": ("BLR", "DEL"),
+    "SC21": ("CDG", "FRA")
+}
 
 
 def save_json(path, data):
@@ -57,8 +81,8 @@ def check_interface():
 
     if "prompt_version" not in parameters:
         raise RuntimeError(
-            "Prompt-version support is not installed. "
-            "Wait for Shristi's PR #13."
+            "The installed agent runner does not support "
+            "prompt_version."
         )
 
     return run_agents
@@ -78,35 +102,99 @@ def prepare_claim(case):
         category if category in valid_types else None
     )
 
-    return {
+    claim = {
         "description": case["claim"],
         "reported_disruption": disruption
     }
 
+    route = ROUTES.get(case["id"])
 
-def normalize_citations(citations):
-    passages = []
+    if route:
+        claim["origin"] = route[0]
+        claim["destination"] = route[1]
 
-    if not isinstance(citations, list):
-        return passages
+    if case["id"] == "SC21":
+        claim["reported_disruption"] = "cancellation"
 
-    for citation in citations:
-        if not isinstance(citation, dict):
+    return claim
+
+
+def claim_fingerprint(claim, version):
+    data = json.dumps(
+        {
+            "claim": claim,
+            "prompt_version": version
+        },
+        sort_keys=True
+    )
+
+    return hashlib.sha256(
+        data.encode("utf-8")
+    ).hexdigest()
+
+
+def normalize_passages(passages):
+    normalized = []
+
+    if not isinstance(passages, list):
+        return normalized
+
+    for passage in passages:
+        if not isinstance(passage, dict):
             continue
 
-        text = citation.get("text") or citation.get("passage")
+        text = (
+            passage.get("passage")
+            or passage.get("text")
+        )
 
         if not text:
             continue
 
-        passages.append({
-            "clause_id": citation.get("clause_id"),
-            "document": citation.get("document"),
-            "page": citation.get("page"),
+        normalized.append({
+            "clause_id": passage.get("clause_id"),
+            "document": (
+                passage.get("document")
+                or passage.get("source")
+            ),
+            "page": passage.get("page"),
             "passage": text
         })
 
-    return passages
+    return normalized
+
+
+def classify_result(response, passages):
+    scope = response.get("regulatory_scope") or {}
+    verification = response.get("citation_verification") or {}
+    analysis = response.get("analysis") or {}
+
+    scope_status = scope.get("status")
+
+    if scope_status in {"outside", "unknown"}:
+        return "completed"
+
+    if scope_status != "supported":
+        return "needs_review"
+
+    if response.get("used_fallback") is not False:
+        return "fallback"
+
+    missing = analysis.get("missing_fields") or []
+
+    if "claim_analysis_unavailable" in missing:
+        return "needs_review"
+
+    if verification.get("status") != "passed":
+        return "needs_review"
+
+    if verification.get("rejected_count", 0) != 0:
+        return "needs_review"
+
+    if not passages:
+        return "needs_review"
+
+    return "completed"
 
 
 def run_scenario(case, version, run_agents):
@@ -118,7 +206,7 @@ def run_scenario(case, version, run_agents):
     )
 
     if not isinstance(response, dict):
-        raise ValueError("Agent returned an invalid response")
+        raise ValueError("Invalid agent response")
 
     recorded_version = response.get("prompt_version")
 
@@ -129,22 +217,33 @@ def run_scenario(case, version, run_agents):
         )
 
     review = response.get("entitlement_review") or {}
-
     verification = response.get("citation_verification") or {}
 
-    citations = normalize_citations(
+    citations = normalize_passages(
         response.get("citations") or []
+    )
+
+    retrieved_passages = normalize_passages(
+        response.get("retrieved_passages") or []
+    )
+
+    status = classify_result(
+        response,
+        retrieved_passages
     )
 
     return {
         "scenario_id": case["id"],
         "category": case["category"],
         "claim": case["claim"],
+        "input_claim": claim,
+        "input_fingerprint": claim_fingerprint(claim, version),
         "expected_outcome": case["expected_outcome"],
         "expected_route": case["expected_route"],
         "expected_clauses": case["expected_clauses"],
         "prompt_version": recorded_version,
-        "status": "completed",
+        "status": status,
+        "used_fallback": response.get("used_fallback"),
         "agent_route": response.get("route"),
         "agent_outcome": response.get("outcome"),
         "agent_recommendation": review.get("recommendation"),
@@ -158,9 +257,9 @@ def run_scenario(case, version, run_agents):
             "supporting_clause_ids", []
         ),
         "citations": citations,
-        "retrieved_passages": citations,
-        "context_source": "final_verified_citations",
-        "full_retrieval_context_available": False,
+        "retrieved_passages": retrieved_passages,
+        "context_source": "verified_rag_evidence",
+        "full_retrieval_context_available": True,
         "verified": response.get("verified"),
         "citation_verification": verification,
         "monetary_compensation": response.get(
@@ -207,15 +306,35 @@ def evaluate(versions, delay, limit):
 
         for case in cases:
             case_id = case["id"]
+            claim = prepare_claim(case)
+
+            fingerprint = claim_fingerprint(
+                claim,
+                version
+            )
 
             existing = results.get(case_id)
 
             if (
                 isinstance(existing, dict)
                 and existing.get("status") == "completed"
+                and existing.get("input_fingerprint") == fingerprint
+                and existing.get("used_fallback") is False
             ):
                 print(f"{case_id} | SKIPPED")
                 continue
+
+            previous_attempts = []
+
+            if isinstance(existing, dict):
+                previous_attempts = list(
+                    existing.get("previous_attempts") or []
+                )
+
+                archived = dict(existing)
+                archived.pop("previous_attempts", None)
+
+                previous_attempts.append(archived)
 
             print(f"\nRunning {case_id}...", flush=True)
 
@@ -226,11 +345,16 @@ def evaluate(versions, delay, limit):
                     run_agents
                 )
 
+                result["previous_attempts"] = previous_attempts
+
                 results[case_id] = result
 
                 print(
-                    f"{case_id} | COMPLETED | "
+                    f"{case_id} | "
+                    f"{result['status'].upper()} | "
+                    f"Fallback: {result['used_fallback']} | "
                     f"Route: {result['agent_route']} | "
+                    f"Passages: {len(result['retrieved_passages'])} | "
                     f"Citations: {len(result['citations'])}"
                 )
 
@@ -240,6 +364,7 @@ def evaluate(versions, delay, limit):
                     "prompt_version": version,
                     "status": "error",
                     "error": str(error),
+                    "previous_attempts": previous_attempts,
                     "timestamp": datetime.now(
                         timezone.utc
                     ).isoformat()
@@ -256,7 +381,7 @@ def evaluate(versions, delay, limit):
                     or "503" in error_text
                     or "RESOURCE_EXHAUSTED" in error_text
                 ):
-                    print("API error detected. Progress saved.")
+                    print("API error. Progress saved.")
                     return
 
                 if "Prompt version mismatch" in error_text:
@@ -270,12 +395,13 @@ def evaluate(versions, delay, limit):
         completed = sum(
             isinstance(item, dict)
             and item.get("status") == "completed"
+            and item.get("used_fallback") is False
             for item in results.values()
         )
 
         print("\n" + "=" * 45)
         print(f"Version: {version}")
-        print(f"Completed: {completed}/{len(cases)}")
+        print(f"Non-fallback completed: {completed}/{len(cases)}")
         print(f"Results saved to: {results_file}")
 
 

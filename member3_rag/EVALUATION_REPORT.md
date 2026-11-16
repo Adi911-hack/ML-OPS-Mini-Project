@@ -354,3 +354,53 @@ The RAG retrieval and citation-verification components have been implemented and
 The current results establish retrieval performance and citation consistency.
 
 The final L2 and L3 requirements will be complete only after both prompt versions have been executed on the fixed evaluation dataset, the four required metrics have been measured, and the before-and-after comparison has been documented.
+## Final L2 Prompt-Version Comparison
+
+### Evaluation Setup
+
+Two entitlement prompt versions were evaluated:
+
+- v1-basic
+- v2-exception-aware
+
+The evaluation dataset contains 21 scenarios covering airline disruption claims and regulatory edge cases.
+
+Gemini 503 fallback runs were tracked separately and excluded from the direct prompt comparison.
+
+### Evaluation Results
+
+| Metric | v1-basic | v2-exception-aware |
+|---|---|---|
+| Total scenarios in dataset | 21 | 21 |
+| Valid non-fallback runs recorded | 18 | 11 |
+| Comparable non-fallback scenarios | 11 | 11 |
+| Expected regulatory clauses retrieved | 11/16 | 12/16 |
+| Expected-clause recall | 68.75% | 75.00% |
+
+The comparable scenarios were SC01, SC02, SC03, SC04, SC05, SC06, SC07, SC11, SC12, SC13, and SC14.
+
+The v2-exception-aware prompt achieved a 6.25 percentage-point improvement in expected-clause retrieval recall over v1-basic.
+
+### Observations
+
+1. Both prompt versions successfully retrieved relevant DGCA regulatory passages.
+2. The v2-exception-aware prompt retrieved one additional expected clause across the 11 comparable scenarios.
+3. Several scenarios produced request-further-evidence recommendations because the entitlement assessment was limited or information was missing.
+4. Gemini 503 errors caused some runs to use fallback retrieval.
+5. Retrieved regulatory evidence was evaluated separately from citations supporting the final entitlement decision.
+6. The comparison does not establish that v2 produces more accurate entitlement decisions.
+
+### Limitations
+
+- The direct comparison includes 11 valid paired scenarios, rather than all 21.
+- The v2-exception-aware evaluation had only reached scenario SC15.
+- Groundedness, context relevance, faithfulness, and hallucination rate require completed evidence-level annotations; final numerical values are not yet established.
+- Further evaluation is required before claiming a statistically reliable improvement in overall decision quality.
+
+### Conclusion
+
+The exception-aware prompt demonstrated better expected-clause retrieval recall on the available paired scenarios (75.00% versus 68.75%).
+
+The evaluation also identified limitations in automated entitlement reasoning and intermittent Gemini service availability.
+
+These results provide preliminary evidence of improved retrieval coverage, but not a verified improvement in final compensation decisions.
