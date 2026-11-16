@@ -189,3 +189,90 @@ def test_potential_amount_does_not_approve_payment():
     assert monetary["amount_inr"] is None
     assert result["route"] == "request-further-evidence"
     assert result["verification_passed"] is False
+
+def test_provided_fare_is_not_reported_missing():
+    result = review_entitlement(
+        {},
+        analysis(
+            alternate_flight_offered=False,
+            alternate_flight_accepted=False,
+            booked_one_way_basic_fare=6000,
+            airline_fuel_charge=500
+        ),
+        evidence()
+    )
+
+    missing = result["missing_information"]
+
+    assert "booked_one_way_basic_fare" not in missing
+    assert "airline_fuel_charge" not in missing
+
+    assert (
+        result["monetary_compensation"]["potential_amount_inr"]
+        == 6500
+    )
+
+    assert result["route"] == "request-further-evidence"
+
+def test_verified_payment_route():
+    result = review_entitlement(
+        {},
+        analysis(
+            alternate_flight_offered=False,
+            alternate_flight_accepted=False,
+            booked_one_way_basic_fare=6000,
+            airline_fuel_charge=500
+        ),
+        evidence(),
+        eligibility_review={
+            "fare_status": "verified",
+            "exception_status": "ruled_out",
+            "alternate_refund_status": "confirmed"
+        }
+    )
+
+    assert result["route"] == "pay-as-computed"
+    assert result["verification_passed"] is True
+    assert result["human_escalation"] is False
+
+    assert (
+        result["monetary_compensation"]["amount_inr"]
+        == 6500
+    )
+
+    assert (
+        result["monetary_compensation"]["status"]
+        == "payable"
+    )
+
+def test_payment_without_verified_evidence_escalates():
+    result = review_entitlement(
+        {},
+        analysis(
+            alternate_flight_offered=False,
+            alternate_flight_accepted=False,
+            booked_one_way_basic_fare=6000,
+            airline_fuel_charge=500
+        ),
+        evidence()
+    )
+
+    assert result["route"] == "request-further-evidence"
+    assert result["verification_passed"] is False
+    assert result["monetary_compensation"]["amount_inr"] is None
+
+def test_payment_without_verified_evidence_escalates():
+    result = review_entitlement(
+        {},
+        analysis(
+            alternate_flight_offered=False,
+            alternate_flight_accepted=False,
+            booked_one_way_basic_fare=6000,
+            airline_fuel_charge=500
+        ),
+        evidence()
+    )
+
+    assert result["route"] == "request-further-evidence"
+    assert result["verification_passed"] is False
+    assert result["monetary_compensation"]["amount_inr"] is None

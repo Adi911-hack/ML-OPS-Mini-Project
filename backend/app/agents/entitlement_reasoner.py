@@ -57,7 +57,12 @@ def calculate_compensation(block_time, basic_fare, fuel_charge):
 
 
 
-def review_entitlement(claim, analysis, verified_passages):
+def review_entitlement(
+    claim,
+    analysis,
+    verified_passages,
+    eligibility_review=None
+):
     result = {
         "route": "request-further-evidence",
         "recommendation": "Human review required",
@@ -277,11 +282,15 @@ def review_entitlement(claim, analysis, verified_passages):
             "subject to alternative travel, fare evidence "
             "and extraordinary-circumstance checks."
         )
-        missing.extend([
-            "booked_one_way_basic_fare",
-            "airline_fuel_charge",
+        if basic_fare is None:
+            missing.append("booked_one_way_basic_fare")
+
+        if fuel_charge is None:
+            missing.append("airline_fuel_charge")
+
+        missing.append(
             "confirmed_alternate_travel_or_refund_choice"
-        ])
+        )
 
     elif notice_valid and notice >= 1440:
         monetary["status"] = "alternate_or_refund_review"
@@ -328,6 +337,61 @@ def review_entitlement(claim, analysis, verified_passages):
         result["supporting_clause_ids"] = [
             "DGCA:3.3.2",
             "DGCA:3.8.1"
+        ]
+
+        result["verification_passed"] = True
+        result["human_escalation"] = False
+
+        result["missing_information"] = [
+            item for item in dict.fromkeys(missing)
+            if item == "airport_reporting_and_waiting_details"
+        ]
+
+        return result
+
+    eligibility = eligibility_review or {}
+
+    payment_evidence_verified = (
+        eligibility.get("fare_status") == "verified"
+        and eligibility.get("exception_status") == "ruled_out"
+        and eligibility.get("alternate_refund_status") == "confirmed"
+    )
+
+    if (
+        notice_valid
+        and notice < 1440
+        and contact is True
+        and alternate_offered is False
+        and alternate_accepted is False
+        and block_valid
+        and calculated_amount is not None
+        and calculated_amount > 0
+        and payment_evidence_verified
+        and not analysis.get("contradictions")
+    ):
+        monetary["status"] = "payable"
+        monetary["amount_inr"] = calculated_amount
+
+        result["route"] = "pay-as-computed"
+        result["recommendation"] = (
+            "Recommend compensation based on verified "
+            "eligibility evidence and applicable DGCA limits."
+        )
+
+        result["reasoning"] = (
+            "The reported cancellation notice was less than "
+            "24 hours. No alternate flight was offered, and "
+            "the trusted eligibility review confirmed the "
+            "fare, applicable exception checks and travel "
+            "arrangement conditions. Compensation is calculated "
+            "using DGCA 3.3.2."
+        )
+
+        result["supporting_clause_ids"] = [
+            "DGCA:3.3.1",
+            "DGCA:3.3.2",
+            "DGCA:3.3.3",
+            "DGCA:3.3.4"
         ]
 
         result["verification_passed"] = True

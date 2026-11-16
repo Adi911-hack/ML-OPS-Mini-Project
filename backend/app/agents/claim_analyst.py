@@ -178,13 +178,14 @@ def is_temporary_model_error(error):
     )
 
 
-def analyze_claim(claim_data):
-    CLAIM_GEMINI_BREAKER = CircuitBreaker(
+CLAIM_GEMINI_BREAKER = CircuitBreaker(
     failure_threshold=3,
     recovery_timeout=30
 )
-    load_dotenv(dotenv_path=".env")
 
+
+def analyze_claim(claim_data):
+    load_dotenv(dotenv_path=".env")
     claim = PassengerClaim.model_validate(claim_data)
 
     model_name = os.getenv("MODEL_NAME")

@@ -2,6 +2,20 @@
 from unittest.mock import Mock
 
 from app.agents import claim_analyst
+import pytest
+
+@pytest.fixture(autouse=True)
+def fresh_circuit_breaker(monkeypatch):
+    breaker = claim_analyst.CircuitBreaker(
+        failure_threshold=3,
+        recovery_timeout=30
+    )
+
+    monkeypatch.setattr(
+        claim_analyst,
+        "CLAIM_GEMINI_BREAKER",
+        breaker
+    )
 
 
 def sample_claim():
@@ -114,3 +128,54 @@ def test_non_retryable_error_is_raised(monkeypatch):
         assert str(error) == "Invalid request"
     else:
         raise AssertionError("Expected ValueError")
+
+def test_circuit_breaker_persists_between_claims(monkeypatch):
+    monkeypatch.setenv("MODEL_NAME", "test-model")
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
+
+    monkeypatch.setattr(
+        claim_analyst,
+        "ChatGoogleGenerativeAI",
+        lambda **kwargs: object()
+    )
+
+    monkeypatch.setattr(
+        claim_analyst,
+        "create_claim_tools",
+        lambda claim: []
+    )
+
+    from unittest.mock import Mock
+
+    agent = Mock()
+    agent.invoke.side_effect = Exception(
+        "503 UNAVAILABLE: high demand"
+    )
+
+    monkeypatch.setattr(
+        claim_analyst,
+        "create_agent",
+        lambda **kwargs: agent
+    )
+
+    monkeypatch.setattr(
+        claim_analyst.time,
+        "sleep",
+        lambda seconds: None
+    )
+
+    first = claim_analyst.analyze_claim(sample_claim())
+
+    assert first["disruption_type"] == "unknown"
+    assert agent.invoke.call_count == 3
+
+    assert (
+        claim_analyst.CLAIM_GEMINI_BREAKER.state
+        == "open"
+    )
+
+    second = claim_analyst.analyze_claim(sample_claim())
+
+    assert second["disruption_type"] == "unknown"
+
+    assert agent.invoke.call_count == 3

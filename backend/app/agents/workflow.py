@@ -16,11 +16,13 @@ tracer = trace.get_tracer(__name__)
 
 
 class ClaimState(TypedDict, total=False):
+
     claim: dict
     analysis: dict
     entitlement: dict
     run_id: str | None
     prompt_version: str | None
+    eligibility_review: dict | None
 
 
 def set_run_id(span, run_id):
@@ -118,7 +120,12 @@ def normalize_claim_analysis(claim, analysis):
     return analysis
 
 
-def attach_entitlement_review(claim, analysis, entitlement):
+def attach_entitlement_review(
+    claim,
+    analysis,
+    entitlement,
+    eligibility_review=None
+):
     result = dict(entitlement)
 
     verification = result.get("citation_verification") or {}
@@ -153,26 +160,34 @@ def attach_entitlement_review(claim, analysis, entitlement):
             flush=True
         )
 
+        review_kwargs = {}
+
+        if eligibility_review is not None:
+            review_kwargs["eligibility_review"] = eligibility_review
+
         result["entitlement_review"] = review_entitlement(
             claim,
             analysis,
-            passages
+            passages,
+            **review_kwargs
         )
 
     review = result["entitlement_review"]
+
     result["route"] = review.get(
-    "route", "request-further-evidence"
-)
+        "route",
+        "request-further-evidence"
+    )
 
     result["verification_passed"] = (
         verified
         and review.get("verification_passed") is True
-)
+    )
 
     result["human_escalation"] = (
         not result["verification_passed"]
         or review.get("human_escalation", True)
-)
+    )
 
     result["monetary_compensation"] = review.get(
         "monetary_compensation",
@@ -329,10 +344,20 @@ def entitlement_node(state: ClaimState):
         ) as child:
             set_run_id(child, run_id)
 
-            entitlement = attach_entitlement_review(
-                state["claim"],
-                state["analysis"],
-                entitlement
+            eligibility_review = state.get("eligibility_review")
+
+            if eligibility_review is None:
+                entitlement = attach_entitlement_review(
+                    state["claim"],
+                    state["analysis"],
+                    entitlement
+            )
+            else:
+                entitlement = attach_entitlement_review(
+                    state["claim"],
+                    state["analysis"],
+                    entitlement,
+                    eligibility_review=eligibility_review
             )
 
             review = entitlement.get("entitlement_review") or {}
@@ -363,14 +388,20 @@ def create_workflow():
     return graph.compile()
 
 
-def run_claim_agents(claim, run_id=None, prompt_version=None):
+def run_claim_agents(
+    claim,
+    run_id=None,
+    prompt_version=None,
+    eligibility_review=None
+):
     workflow = create_workflow()
 
     result = workflow.invoke(
         {
             "claim": claim,
             "run_id": run_id,
-            "prompt_version": prompt_version
+            "prompt_version": prompt_version,
+            "eligibility_review": eligibility_review
         },
         config={"recursion_limit": 24}
     )
