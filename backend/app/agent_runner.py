@@ -124,6 +124,8 @@ def scope_escalation(
         "verified": False,
         "escalation_reason": reason,
         "prompt_version": prompt_version,
+        "used_fallback": False,
+        "retrieved_passages": [],
         "analysis": {
             "disruption_type": "unknown",
             "missing_fields": ["regulatory_scope_verification"],
@@ -312,10 +314,27 @@ def run_agents(
         escalation_reason = None
 
         if outcome == "escalated":
-            escalation_reason = (
-                entitlement.get("escalation_reason")
-                or reason
-            )
+            missing = review.get("missing_information") or []
+
+            if (
+                verification.get("status") == "passed"
+                and missing
+            ):
+                readable_missing = [
+                    str(item).replace("_", " ")
+                    for item in missing
+                ]
+
+                escalation_reason = (
+                    "Further evidence required: "
+                    + ", ".join(readable_missing)
+                    + "."
+                )
+            else:
+                escalation_reason = (
+                    entitlement.get("escalation_reason")
+                    or reason
+                )
 
         span.set_attribute("decision.route", route)
         span.set_attribute("decision.outcome", outcome)
@@ -328,6 +347,12 @@ def run_agents(
             "verified": decision_verified,
             "escalation_reason": escalation_reason,
             "prompt_version": prompt_version,
+            "used_fallback": bool(
+                entitlement.get("used_fallback", False)
+            ),
+            "retrieved_passages": entitlement.get(
+                "retrieved_passages"
+            ) or [],
             "analysis": analysis,
             "entitlement_review": review,
             "monetary_compensation": entitlement.get(
