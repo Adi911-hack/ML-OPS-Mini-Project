@@ -221,14 +221,10 @@ def test_verified_payment_route():
             alternate_flight_offered=False,
             alternate_flight_accepted=False,
             booked_one_way_basic_fare=6000,
-            airline_fuel_charge=500
+            airline_fuel_charge=500,
+            cancellation_cause="ordinary"
         ),
-        evidence(),
-        eligibility_review={
-            "fare_status": "verified",
-            "exception_status": "ruled_out",
-            "alternate_refund_status": "confirmed"
-        }
+        evidence()
     )
 
     assert result["route"] == "pay-as-computed"

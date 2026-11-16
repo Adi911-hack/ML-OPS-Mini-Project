@@ -32,7 +32,8 @@ def make_analysis():
         "contact_details_provided": True,
         "booked_one_way_basic_fare": 6000,
         "airline_fuel_charge": 500,
-        "contradictions": []
+        "contradictions": [],
+        "cancellation_cause": "ordinary"
     }
 
 
@@ -67,8 +68,7 @@ def test_verified_evidence_allows_payment():
     result = attach_entitlement_review(
         {},
         make_analysis(),
-        make_entitlement(),
-        eligibility_review=make_eligibility_review()
+        make_entitlement()
     )
 
     assert result["route"] == "pay-as-computed"
@@ -81,10 +81,29 @@ def test_verified_evidence_allows_payment():
     )
 
 
-def test_missing_eligibility_evidence_blocks_payment():
+def test_unknown_cancellation_cause_blocks_payment():
+    analysis = make_analysis()
+    analysis["cancellation_cause"] = None
+
     result = attach_entitlement_review(
         {},
-        make_analysis(),
+        analysis,
+        make_entitlement()
+    )
+
+    assert result["route"] == "request-further-evidence"
+    assert result["verification_passed"] is False
+    assert result["human_escalation"] is True
+    assert result["monetary_compensation"]["amount_inr"] is None
+
+
+def test_extraordinary_circumstances_escalate():
+    analysis = make_analysis()
+    analysis["cancellation_cause"] = "extraordinary"
+
+    result = attach_entitlement_review(
+        {},
+        analysis,
         make_entitlement()
     )
 
@@ -92,10 +111,37 @@ def test_missing_eligibility_evidence_blocks_payment():
     assert result["verification_passed"] is False
     assert result["human_escalation"] is True
 
-    assert (
-        result["monetary_compensation"]["amount_inr"]
-        is None
+
+def test_disputed_cancellation_cause_escalates():
+    analysis = make_analysis()
+    analysis["cancellation_cause"] = "disputed"
+
+    result = attach_entitlement_review(
+        {},
+        analysis,
+        make_entitlement()
     )
+
+    assert result["route"] == "request-further-evidence"
+    assert result["verification_passed"] is False
+    assert result["human_escalation"] is True
+
+
+def test_contradictions_block_payment():
+    analysis = make_analysis()
+    analysis["contradictions"] = [
+        "Passenger statements contain conflicting information"
+    ]
+
+    result = attach_entitlement_review(
+        {},
+        analysis,
+        make_entitlement()
+    )
+
+    assert result["route"] == "request-further-evidence"
+    assert result["verification_passed"] is False
+    assert result["human_escalation"] is True
 
 
 def test_failed_citations_block_payment():

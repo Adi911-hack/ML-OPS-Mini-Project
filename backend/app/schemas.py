@@ -11,6 +11,10 @@ class DisruptionType(str, Enum):
     delay = "delay"
     downgrading = "downgrading"
 
+class CancellationCause(str, Enum):
+    ordinary = "ordinary"
+    extraordinary = "extraordinary"
+    disputed = "disputed"
 
 class RunStatus(str, Enum):
     queued = "queued"
@@ -38,6 +42,7 @@ class ClaimRequest(BaseModel):
     alternate_flight_accepted: Optional[bool] = None
     alternate_departure: Optional[AwareDatetime] = None
     contact_details_provided: Optional[bool] = None
+    cancellation_cause: Optional[CancellationCause] = None
     booked_one_way_basic_fare: Optional[float] = Field(
     default=None, ge=0, allow_inf_nan=False
                                                     )

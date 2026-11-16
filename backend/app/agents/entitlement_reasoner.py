@@ -240,6 +240,18 @@ def review_entitlement(
         result["missing_information"] = list(dict.fromkeys(missing))
         return result
 
+    cause = analysis.get("cancellation_cause")
+
+    if cause in {"extraordinary", "disputed"}:
+        result["reasoning"] = (
+            "The cancellation cause is reported as extraordinary "
+            "or disputed. Human review is required before "
+            "an entitlement recommendation can be made."
+        )
+        result["missing_information"] = list(dict.fromkeys(
+            missing + ["cancellation_cause_review"]
+        ))
+        return result
     monetary = result["monetary_compensation"]
 
     if contact is False:
@@ -326,12 +338,15 @@ def review_entitlement(
         )
 
         result["reasoning"] = (
-            "The passenger reports accepting an alternate "
-            "flight after cancellation. Under DGCA 3.3.2, "
-            "the accepted alternate-flight option means "
-            "monetary compensation is not payable under "
-            "this provision. Airport assistance must still "
-            "be assessed separately."
+            "The passenger reports accepting an alternate flight "
+            "after cancellation. Under DGCA 3.3.2, monetary "
+            "compensation is not payable under this option. "
+            "Meals and refreshments must be provided under "
+            "the applicable facilities provision when the "
+            "passenger has reported to the airport and is "
+            "waiting for alternate travel. Accommodation may "
+            "also apply when necessary. The customer relations "
+            "officer makes the final determination."
         )
 
         result["supporting_clause_ids"] = [
@@ -349,13 +364,7 @@ def review_entitlement(
 
         return result
 
-    eligibility = eligibility_review or {}
 
-    payment_evidence_verified = (
-        eligibility.get("fare_status") == "verified"
-        and eligibility.get("exception_status") == "ruled_out"
-        and eligibility.get("alternate_refund_status") == "confirmed"
-    )
 
     if (
         notice_valid
@@ -366,7 +375,7 @@ def review_entitlement(
         and block_valid
         and calculated_amount is not None
         and calculated_amount > 0
-        and payment_evidence_verified
+        and analysis.get("cancellation_cause") == "ordinary"
         and not analysis.get("contradictions")
     ):
         monetary["status"] = "payable"
@@ -374,17 +383,19 @@ def review_entitlement(
 
         result["route"] = "pay-as-computed"
         result["recommendation"] = (
-            "Recommend compensation based on verified "
-            "eligibility evidence and applicable DGCA limits."
+            "Recommend compensation based on passenger-reported "
+            "facts and verified DGCA citations. Final decision "
+            "requires customer relations officer review."
         )
 
         result["reasoning"] = (
-            "The reported cancellation notice was less than "
-            "24 hours. No alternate flight was offered, and "
-            "the trusted eligibility review confirmed the "
-            "fare, applicable exception checks and travel "
-            "arrangement conditions. Compensation is calculated "
-            "using DGCA 3.3.2."
+            "The passenger reports cancellation with less than "
+            "24 hours notice, no alternate flight offered, and "
+            "an ordinary cancellation cause. Based on the "
+            "reported facts and verified DGCA citations, "
+            "compensation is recommended under DGCA 3.3.2. "
+            "This is not payment authorization; a customer "
+            "relations officer makes the final decision."
         )
 
         result["supporting_clause_ids"] = [

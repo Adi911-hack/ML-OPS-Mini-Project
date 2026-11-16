@@ -44,7 +44,8 @@ def normalize_claim_analysis(claim, analysis):
         "alternate_flight_accepted",
         "contact_details_provided",
         "booked_one_way_basic_fare",
-        "airline_fuel_charge"
+        "airline_fuel_charge",
+        "cancellation_cause"
     ]
 
     for field in fields:
