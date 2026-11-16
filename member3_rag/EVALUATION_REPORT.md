@@ -455,3 +455,23 @@ Both prompt variants successfully retrieved regulatory evidence.
 The exception-aware version demonstrated slightly higher expected-clause recall, while the limited human-reviewed factual claims were supported by the available evidence.
 
 The findings are preliminary and do not establish superior overall entitlement decision accuracy.
+# L2/L3 Offline Review — Evidence-Bounded Summary
+
+**Status:** AI-assisted annotation prepared; independent human verification is still required before these can be called final human-annotated metrics.
+
+The fair comparison contains 11 matched non-fallback runs. The v2 evaluation only attempted scenarios SC01–SC15; this is not a full 21-pair evaluation.
+
+| Measure | v1-basic | v2-exception-aware |
+|---|---:|---:|
+| Expected-clause recall | 11/16 (68.75%) | 12/16 (75.00%) |
+| Context relevance: gold-ID precision proxy, macro average | 14.97% | 14.00% |
+| Factual claims with evidence screening | 6 | 3 |
+| Groundedness on screened claims only | 100% | 100% |
+| Faithfulness on screened claims only | 100% | 100% |
+| Hallucination rate on screened claims only | 0% | 0% |
+
+**Interpretation:** The one-clause retrieval difference is small and not proof of better answers. The 100% and 0% rates cover only a few selected substantive claims, not all scenarios; they cannot establish model-wide factual accuracy. Gold-ID matching is a narrow *proxy* for context relevance, not full expert passage relevance.
+
+Generic refusal/escalation outputs do not make independently testable regulatory factual claims and are marked N/A, not automatically scored as correct. Their inability to answer the scenario remains a separate decision-quality failure/coverage limitation.
+
+The accompanying reviewed JSON uses explicit `factual_metrics_applicable` and `annotation_provenance` fields. It intentionally does not conform to the project's original `evaluate_metrics.py` validator for zero-claim cases: that validator rejects empty `factual_claims` on nonempty responses. The summaries here were derived offline and cannot be substituted for the complete required human-reviewed L2/L3 metrics.
