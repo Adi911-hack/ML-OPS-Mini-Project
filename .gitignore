@@ -6,4 +6,5 @@ __pycache__/
 member3_rag/chroma_db/
 member3_rag/chunks.json
 member3_rag/evaluation_results.json
+member3_rag/agent_evaluation_results/
 .env
