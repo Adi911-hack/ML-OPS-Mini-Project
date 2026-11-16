@@ -3,6 +3,7 @@ import pytest
 
 from app.agents.entitlement_reasoner import (
     compensation_cap,
+    calculate_compensation,
     review_entitlement
 )
 
@@ -86,16 +87,23 @@ def test_accepted_alternative_keeps_assistance_review():
         evidence()
     )
 
+    assert result["route"] == "decline"
+    assert result["verification_passed"] is True
+    assert result["human_escalation"] is False
+
     assert (
         result["monetary_compensation"]["status"]
-        == "alternate_flight_accepted"
+        == "not_payable"
     )
+
+    assert result["monetary_compensation"]["amount_inr"] == 0
+
     assert (
         result["airport_assistance"]["meals_and_refreshments"]
         == "potentially_applicable"
     )
-    assert result["route"] == "request-further-evidence"
 
+    assert "DGCA:3.3.2" in result["supporting_clause_ids"]
 
 def test_contact_exclusion_is_not_automatic_payment():
     result = review_entitlement(
@@ -134,3 +142,50 @@ def test_contradictions_require_review():
     assert "resolve_claim_contradictions" in result["missing_information"]
     assert result["verification_passed"] is False
 
+@pytest.mark.parametrize(
+    "block_time,basic_fare,fuel_charge,expected",
+    [
+        (45, 3000, 500, 3500),
+        (90, 8000, 500, 7500),
+        (150, 6000, 500, 6500),
+        (150, 12000, 500, 10000),
+        (None, 6000, 500, None),
+        (150, None, 500, None),
+        (150, -100, 500, None),
+        (150, True, 500, None)
+    ]
+)
+def test_calculate_compensation(
+    block_time,
+    basic_fare,
+    fuel_charge,
+    expected
+):
+    result = calculate_compensation(
+        block_time,
+        basic_fare,
+        fuel_charge
+    )
+
+    assert result == expected
+
+def test_potential_amount_does_not_approve_payment():
+    claim_analysis = analysis(
+        alternate_flight_offered=False,
+        alternate_flight_accepted=False,
+        booked_one_way_basic_fare=6000,
+        airline_fuel_charge=500
+    )
+
+    result = review_entitlement(
+        {},
+        claim_analysis,
+        evidence()
+    )
+
+    monetary = result["monetary_compensation"]
+
+    assert monetary["potential_amount_inr"] == 6500
+    assert monetary["amount_inr"] is None
+    assert result["route"] == "request-further-evidence"
+    assert result["verification_passed"] is False

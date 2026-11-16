@@ -3,6 +3,10 @@ from opentelemetry import trace
 
 from app.agents.workflow import run_claim_agents
 from app.agents.regulatory_scope import check_regulatory_scope
+from app.agents.guardrails import (
+    check_claim_input,
+    validate_agent_output
+)
 
 
 tracer = trace.get_tracer(__name__)
@@ -148,6 +152,36 @@ def run_agents(claim, run_id=None):
         with tracer.start_as_current_span("prepare_claim") as child:
             set_run_id(child, run_id)
             agent_claim = prepare_agent_claim(claim)
+        with tracer.start_as_current_span("input_guardrails") as child:
+            set_run_id(child, run_id)
+
+            guardrail_result = check_claim_input(agent_claim)
+
+            child.set_attribute(
+                "guardrails.prompt_injection_detected",
+                guardrail_result["prompt_injection_detected"]
+            )
+
+            child.set_attribute(
+                "guardrails.toxicity_detected",
+                guardrail_result["toxicity_detected"]
+            )
+
+            if any(guardrail_result.values()):
+                reason = (
+                    "The claim requires human review because "
+                    "the input safety checks detected suspicious "
+                    "or threatening content."
+                )
+
+                result = scope_escalation({
+                    "status": "not_assessed",
+                    "reason": reason
+                })
+
+                result["guardrail_flags"] = guardrail_result
+
+                return result
 
         with tracer.start_as_current_span("regulatory_scope") as child:
             set_run_id(child, run_id)
@@ -251,7 +285,7 @@ def run_agents(claim, run_id=None):
         span.set_attribute("decision.route", route)
         span.set_attribute("decision.outcome", outcome)
 
-        return {
+        response= {
             "outcome": outcome,
             "route": route,
             "basis": reason,
@@ -281,3 +315,30 @@ def run_agents(claim, run_id=None):
             "tool_calls": entitlement.get("tool_calls", []),
             "regulatory_scope": scope
         }
+        with tracer.start_as_current_span("output_guardrails") as child:
+            set_run_id(child, run_id)
+
+            output_valid = validate_agent_output(response)
+
+            child.set_attribute(
+                "guardrails.output_valid",
+                output_valid
+            )
+
+            if not output_valid:
+                response["outcome"] = "escalated"
+                response["route"] = "request-further-evidence"
+                response["verified"] = False
+                response["basis"] = (
+                    "Agent output failed safety validation. "
+                    "Human review is required."
+                )
+                response["escalation_reason"] = response["basis"]
+
+                response["monetary_compensation"] = {
+                    "status": "undetermined",
+                    "amount_inr": None,
+                    "maximum_cap_inr": None
+                }
+
+        return response

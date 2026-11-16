@@ -30,6 +30,32 @@ def compensation_cap(block_time):
 
     return 10000
 
+def calculate_compensation(block_time, basic_fare, fuel_charge):
+    import math
+
+    cap = compensation_cap(block_time)
+
+    if cap is None:
+        return None
+
+    for value in (basic_fare, fuel_charge):
+        if isinstance(value, bool):
+            return None
+
+        if not isinstance(value, (int, float)):
+            return None
+
+        if not math.isfinite(value) or value < 0:
+            return None
+
+    amount = basic_fare + fuel_charge
+
+    if not math.isfinite(amount):
+        return None
+
+    return round(min(cap, amount), 2)
+
+
 
 def review_entitlement(claim, analysis, verified_passages):
     result = {
@@ -94,6 +120,14 @@ def review_entitlement(claim, analysis, verified_passages):
     notice = analysis.get("notice_minutes")
     block_time = analysis.get("block_time_minutes")
     contact = analysis.get("contact_details_provided")
+    basic_fare = analysis.get("booked_one_way_basic_fare")
+    fuel_charge = analysis.get("airline_fuel_charge")
+
+    calculated_amount = calculate_compensation(
+        block_time,
+        basic_fare,
+        fuel_charge
+    )
     alternate_offered = analysis.get("alternate_flight_offered")
     alternate_accepted = analysis.get("alternate_flight_accepted")
 
@@ -145,6 +179,7 @@ def review_entitlement(claim, analysis, verified_passages):
     cap = compensation_cap(block_time)
 
     result["monetary_compensation"]["maximum_cap_inr"] = cap
+    result["monetary_compensation"]["potential_amount_inr"] = calculated_amount
 
     conditions.append({
         "name": "flight_block_time",
@@ -263,6 +298,47 @@ def review_entitlement(claim, analysis, verified_passages):
             "The available information is insufficient "
             "for a reliable monetary compensation assessment."
         )
+
+    if (
+        alternate_offered is True
+        and alternate_accepted is True
+        and contact is True
+        and notice_valid
+        and block_valid
+        and not analysis.get("contradictions")
+    ):
+        monetary["status"] = "not_payable"
+        monetary["amount_inr"] = 0
+
+        result["route"] = "decline"
+        result["recommendation"] = (
+            "No monetary compensation payable under "
+            "the accepted alternate-flight option."
+        )
+
+        result["reasoning"] = (
+            "The passenger reports accepting an alternate "
+            "flight after cancellation. Under DGCA 3.3.2, "
+            "the accepted alternate-flight option means "
+            "monetary compensation is not payable under "
+            "this provision. Airport assistance must still "
+            "be assessed separately."
+        )
+
+        result["supporting_clause_ids"] = [
+            "DGCA:3.3.2",
+            "DGCA:3.8.1"
+        ]
+
+        result["verification_passed"] = True
+        result["human_escalation"] = False
+
+        result["missing_information"] = [
+            item for item in dict.fromkeys(missing)
+            if item == "airport_reporting_and_waiting_details"
+        ]
+
+        return result
 
     result["recommendation"] = (
         "Request missing evidence and complete human review"

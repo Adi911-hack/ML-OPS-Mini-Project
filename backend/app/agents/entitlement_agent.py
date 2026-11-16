@@ -10,8 +10,13 @@ from pydantic import BaseModel, Field
 
 from app.agents.tools import create_entitlement_tools
 from app.agents.citation_verifier import verify_passages
+from app.agents.reliability import CircuitBreaker, CircuitOpenError
 
 
+GEMINI_CIRCUIT_BREAKER = CircuitBreaker(
+    failure_threshold=3,
+    recovery_timeout=30
+)
 class ToolRequest(BaseModel):
     name: Literal[
         "get_claim_fields",
@@ -429,15 +434,27 @@ def evaluate_entitlement(
     used_fallback = False
 
     try:
-        plan = planner.invoke([
-            ("system", SYSTEM_PROMPT),
-            ("human", json.dumps(message, default=str))
-        ])
+        plan = GEMINI_CIRCUIT_BREAKER.call(
+            planner.invoke,
+            [
+                ("system", SYSTEM_PROMPT),
+                ("human", json.dumps(message, default=str))
+            ]
+        )
 
         if plan is None or not plan.tool_requests:
             used_fallback = True
             plan = fallback_plan(disruption_type)
 
+    except CircuitOpenError:
+        print(
+            "Gemini circuit breaker is open. "
+            "Using fallback research plan.",
+            flush=True
+        )
+
+        used_fallback = True
+        plan = fallback_plan(disruption_type)
     except GoogleAPIError as error:
         if "503" not in str(error):
             raise

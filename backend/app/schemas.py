@@ -38,6 +38,12 @@ class ClaimRequest(BaseModel):
     alternate_flight_accepted: Optional[bool] = None
     alternate_departure: Optional[AwareDatetime] = None
     contact_details_provided: Optional[bool] = None
+    booked_one_way_basic_fare: Optional[float] = Field(
+    default=None, ge=0, allow_inf_nan=False
+                                                    )
+    airline_fuel_charge: Optional[float] = Field(
+    default=None, ge=0, allow_inf_nan=False
+                                            )
 
     @model_validator(mode="after")
     def check_cross_field_rules(self):

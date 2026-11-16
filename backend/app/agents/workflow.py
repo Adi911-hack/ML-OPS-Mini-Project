@@ -1,5 +1,6 @@
 
 from typing import TypedDict
+from unittest import result
 
 from langgraph.graph import StateGraph, START, END
 from opentelemetry import trace
@@ -38,7 +39,9 @@ def normalize_claim_analysis(claim, analysis):
         "block_time_minutes",
         "alternate_flight_offered",
         "alternate_flight_accepted",
-        "contact_details_provided"
+        "contact_details_provided",
+        "booked_one_way_basic_fare",
+        "airline_fuel_charge"
     ]
 
     for field in fields:
@@ -156,9 +159,19 @@ def attach_entitlement_review(claim, analysis, entitlement):
         )
 
     review = result["entitlement_review"]
-    result["route"] = "request-further-evidence"
-    result["human_escalation"] = True
-    result["verification_passed"] = False
+    result["route"] = review.get(
+    "route", "request-further-evidence"
+)
+
+    result["verification_passed"] = (
+        verified
+        and review.get("verification_passed") is True
+)
+
+    result["human_escalation"] = (
+        not result["verification_passed"]
+        or review.get("human_escalation", True)
+)
 
     result["monetary_compensation"] = review.get(
         "monetary_compensation",
