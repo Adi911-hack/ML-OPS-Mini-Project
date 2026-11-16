@@ -7,6 +7,10 @@ from app.agents.guardrails import (
     check_claim_input,
     validate_agent_output
 )
+from app.agents.entitlement_agent import (
+    DEFAULT_PROMPT_VERSION,
+    get_entitlement_prompt
+)
 
 
 tracer = trace.get_tracer(__name__)
@@ -106,7 +110,10 @@ def set_run_id(span, run_id):
         span.set_attribute("run_id", str(run_id))
 
 
-def scope_escalation(scope):
+def scope_escalation(
+    scope,
+    prompt_version=DEFAULT_PROMPT_VERSION
+):
     reason = scope["reason"]
 
     return {
@@ -116,7 +123,7 @@ def scope_escalation(scope):
         "citations": [],
         "verified": False,
         "escalation_reason": reason,
-        "prompt_version": "v1",
+        "prompt_version": prompt_version,
         "analysis": {
             "disruption_type": "unknown",
             "missing_fields": ["regulatory_scope_verification"],
@@ -145,7 +152,12 @@ def scope_escalation(scope):
     }
 
 
-def run_agents(claim, run_id=None):
+def run_agents(
+    claim,
+    run_id=None,
+    prompt_version=DEFAULT_PROMPT_VERSION
+):
+    get_entitlement_prompt(prompt_version)
     with tracer.start_as_current_span("agent_runner") as span:
         set_run_id(span, run_id)
 
@@ -174,10 +186,13 @@ def run_agents(claim, run_id=None):
                     "or threatening content."
                 )
 
-                result = scope_escalation({
-                    "status": "not_assessed",
-                    "reason": reason
-                })
+                result = scope_escalation(
+                    {
+                        "status": "not_assessed",
+                        "reason": reason
+                    },
+                    prompt_version=prompt_version
+                )
 
                 result["guardrail_flags"] = guardrail_result
 
@@ -195,17 +210,37 @@ def run_agents(claim, run_id=None):
                 "decision.route",
                 "request-further-evidence"
             )
-            return scope_escalation(scope)
+            return scope_escalation(
+                scope,
+                prompt_version=prompt_version
+            )
 
         with tracer.start_as_current_span("agent_workflow") as child:
             set_run_id(child, run_id)
 
-            if run_id is None:
+            if (
+                run_id is None
+                and prompt_version == DEFAULT_PROMPT_VERSION
+            ):
                 workflow_result = run_claim_agents(agent_claim)
-            else:
+
+            elif prompt_version == DEFAULT_PROMPT_VERSION:
                 workflow_result = run_claim_agents(
                     agent_claim,
                     run_id=run_id
+                )
+
+            elif run_id is None:
+                workflow_result = run_claim_agents(
+                    agent_claim,
+                    prompt_version=prompt_version
+                )
+
+            else:
+                workflow_result = run_claim_agents(
+                    agent_claim,
+                    run_id=run_id,
+                    prompt_version=prompt_version
                 )
 
         analysis = workflow_result["analysis"]
@@ -292,7 +327,7 @@ def run_agents(claim, run_id=None):
             "citations": citations,
             "verified": decision_verified,
             "escalation_reason": escalation_reason,
-            "prompt_version": "v1",
+            "prompt_version": prompt_version,
             "analysis": analysis,
             "entitlement_review": review,
             "monetary_compensation": entitlement.get(

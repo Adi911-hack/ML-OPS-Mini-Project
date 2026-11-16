@@ -20,6 +20,7 @@ class ClaimState(TypedDict, total=False):
     analysis: dict
     entitlement: dict
     run_id: str | None
+    prompt_version: str | None
 
 
 def set_run_id(span, run_id):
@@ -274,12 +275,22 @@ def entitlement_node(state: ClaimState):
                 return lookup_clause(*args, **kwargs)
 
         try:
+            entitlement_kwargs = {
+            "search_function": traced_search,
+            "clause_function": traced_clause_lookup
+        }
+
+            prompt_version = state.get("prompt_version")
+
+            if prompt_version is not None:
+                entitlement_kwargs["prompt_version"] = prompt_version
+
             entitlement = evaluate_entitlement(
                 state["claim"],
                 state["analysis"],
-                search_function=traced_search,
-                clause_function=traced_clause_lookup
-            )
+                **entitlement_kwargs
+        )
+
         except Exception as error:
             span.record_exception(error)
             span.set_attribute("entitlement.fallback", True)
@@ -352,13 +363,14 @@ def create_workflow():
     return graph.compile()
 
 
-def run_claim_agents(claim, run_id=None):
+def run_claim_agents(claim, run_id=None, prompt_version=None):
     workflow = create_workflow()
 
     result = workflow.invoke(
         {
             "claim": claim,
-            "run_id": run_id
+            "run_id": run_id,
+            "prompt_version": prompt_version
         },
         config={"recursion_limit": 24}
     )
