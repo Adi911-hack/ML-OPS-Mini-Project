@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import inspect
 import json
 import sys
@@ -16,6 +17,29 @@ PROMPT_VERSIONS = [
     "v1-basic",
     "v2-exception-aware"
 ]
+
+ROUTES = {
+    "SC01": ("BLR", "DEL"),
+    "SC02": ("BLR", "DEL"),
+    "SC03": ("BLR", "DEL"),
+    "SC04": ("BLR", "DEL"),
+    "SC05": ("BLR", "DEL"),
+    "SC06": ("BLR", "DEL"),
+    "SC07": ("BLR", "DEL"),
+    "SC08": ("BLR", "DEL"),
+    "SC09": ("BLR", "DEL"),
+    "SC10": ("BLR", "DEL"),
+    "SC11": ("BLR", "DEL"),
+    "SC12": ("BLR", "DEL"),
+    "SC13": ("BLR", "DEL"),
+    "SC14": ("BLR", "DXB"),
+    "SC15": ("BLR", "DEL"),
+    "SC16": ("BLR", "DEL"),
+    "SC17": ("BLR", "DEL"),
+    "SC18": ("BLR", "DEL"),
+    "SC20": ("BLR", "DEL"),
+    "SC21": ("CDG", "FRA")
+}
 
 
 def save_json(path, data):
@@ -57,8 +81,8 @@ def check_interface():
 
     if "prompt_version" not in parameters:
         raise RuntimeError(
-            "Prompt-version support is not installed. "
-            "Wait for Shristi's PR #13."
+            "The installed agent runner does not support "
+            "prompt_version."
         )
 
     return run_agents
@@ -78,10 +102,35 @@ def prepare_claim(case):
         category if category in valid_types else None
     )
 
-    return {
+    claim = {
         "description": case["claim"],
         "reported_disruption": disruption
     }
+
+    route = ROUTES.get(case["id"])
+
+    if route:
+        claim["origin"] = route[0]
+        claim["destination"] = route[1]
+
+    if case["id"] == "SC21":
+        claim["reported_disruption"] = "cancellation"
+
+    return claim
+
+
+def claim_fingerprint(claim, version):
+    data = json.dumps(
+        {
+            "claim": claim,
+            "prompt_version": version
+        },
+        sort_keys=True
+    )
+
+    return hashlib.sha256(
+        data.encode("utf-8")
+    ).hexdigest()
 
 
 def normalize_citations(citations):
@@ -94,7 +143,10 @@ def normalize_citations(citations):
         if not isinstance(citation, dict):
             continue
 
-        text = citation.get("text") or citation.get("passage")
+        text = (
+            citation.get("text")
+            or citation.get("passage")
+        )
 
         if not text:
             continue
@@ -109,6 +161,37 @@ def normalize_citations(citations):
     return passages
 
 
+def classify_result(response, citations):
+    scope = response.get("regulatory_scope") or {}
+    verification = response.get("citation_verification") or {}
+    analysis = response.get("analysis") or {}
+
+    scope_status = scope.get("status")
+    verification_status = verification.get("status")
+
+    if scope_status in {"outside", "unknown"}:
+        return "completed"
+
+    if scope_status != "supported":
+        return "needs_review"
+
+    missing = analysis.get("missing_fields") or []
+
+    if "claim_analysis_unavailable" in missing:
+        return "needs_review"
+
+    if verification_status != "passed":
+        return "needs_review"
+
+    if verification.get("rejected_count", 0) != 0:
+        return "needs_review"
+
+    if not citations:
+        return "needs_review"
+
+    return "completed"
+
+
 def run_scenario(case, version, run_agents):
     claim = prepare_claim(case)
 
@@ -118,7 +201,7 @@ def run_scenario(case, version, run_agents):
     )
 
     if not isinstance(response, dict):
-        raise ValueError("Agent returned an invalid response")
+        raise ValueError("Invalid agent response")
 
     recorded_version = response.get("prompt_version")
 
@@ -129,22 +212,25 @@ def run_scenario(case, version, run_agents):
         )
 
     review = response.get("entitlement_review") or {}
-
     verification = response.get("citation_verification") or {}
 
     citations = normalize_citations(
         response.get("citations") or []
     )
 
+    status = classify_result(response, citations)
+
     return {
         "scenario_id": case["id"],
         "category": case["category"],
         "claim": case["claim"],
+        "input_claim": claim,
+        "input_fingerprint": claim_fingerprint(claim, version),
         "expected_outcome": case["expected_outcome"],
         "expected_route": case["expected_route"],
         "expected_clauses": case["expected_clauses"],
         "prompt_version": recorded_version,
-        "status": "completed",
+        "status": status,
         "agent_route": response.get("route"),
         "agent_outcome": response.get("outcome"),
         "agent_recommendation": review.get("recommendation"),
@@ -207,12 +293,19 @@ def evaluate(versions, delay, limit):
 
         for case in cases:
             case_id = case["id"]
+            claim = prepare_claim(case)
+
+            fingerprint = claim_fingerprint(
+                claim,
+                version
+            )
 
             existing = results.get(case_id)
 
             if (
                 isinstance(existing, dict)
                 and existing.get("status") == "completed"
+                and existing.get("input_fingerprint") == fingerprint
             ):
                 print(f"{case_id} | SKIPPED")
                 continue
@@ -229,10 +322,16 @@ def evaluate(versions, delay, limit):
                 results[case_id] = result
 
                 print(
-                    f"{case_id} | COMPLETED | "
+                    f"{case_id} | "
+                    f"{result['status'].upper()} | "
                     f"Route: {result['agent_route']} | "
                     f"Citations: {len(result['citations'])}"
                 )
+
+                if result["status"] == "needs_review":
+                    print(
+                        "Response needs investigation before scoring."
+                    )
 
             except Exception as error:
                 results[case_id] = {
@@ -256,7 +355,7 @@ def evaluate(versions, delay, limit):
                     or "503" in error_text
                     or "RESOURCE_EXHAUSTED" in error_text
                 ):
-                    print("API error detected. Progress saved.")
+                    print("API error. Progress saved.")
                     return
 
                 if "Prompt version mismatch" in error_text:
