@@ -312,10 +312,27 @@ def run_agents(
         escalation_reason = None
 
         if outcome == "escalated":
-            escalation_reason = (
-                entitlement.get("escalation_reason")
-                or reason
-            )
+            missing = review.get("missing_information") or []
+
+            if (
+                verification.get("status") == "passed"
+                and missing
+            ):
+                readable_missing = [
+                    str(item).replace("_", " ")
+                    for item in missing
+                ]
+
+                escalation_reason = (
+                    "Further evidence required: "
+                    + ", ".join(readable_missing)
+                    + "."
+                )
+            else:
+                escalation_reason = (
+                    entitlement.get("escalation_reason")
+                    or reason
+                )
 
         span.set_attribute("decision.route", route)
         span.set_attribute("decision.outcome", outcome)
