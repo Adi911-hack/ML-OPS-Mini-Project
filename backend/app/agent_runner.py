@@ -124,6 +124,8 @@ def scope_escalation(
         "verified": False,
         "escalation_reason": reason,
         "prompt_version": prompt_version,
+        "used_fallback": False,
+        "retrieved_passages": [],
         "analysis": {
             "disruption_type": "unknown",
             "missing_fields": ["regulatory_scope_verification"],
@@ -345,6 +347,12 @@ def run_agents(
             "verified": decision_verified,
             "escalation_reason": escalation_reason,
             "prompt_version": prompt_version,
+            "used_fallback": bool(
+                entitlement.get("used_fallback", False)
+            ),
+            "retrieved_passages": entitlement.get(
+                "retrieved_passages"
+            ) or [],
             "analysis": analysis,
             "entitlement_review": review,
             "monetary_compensation": entitlement.get(
