@@ -1,0 +1,159 @@
+{
+  "total_scenarios": 21,
+  "total_passages": 105,
+  "verified_passages": 105,
+  "rejected_passages": 0,
+  "citation_integrity_rate": 1.0,
+  "tampering_tests": 21,
+  "tampering_rejected": 21,
+  "tampering_rejection_rate": 1.0,
+  "results": [
+    {
+      "id": "SC01",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC02",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC03",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC04",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC05",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC06",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC07",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC08",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC09",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC10",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC11",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC12",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC13",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC14",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC15",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC16",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC17",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC18",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC19",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC20",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    },
+    {
+      "id": "SC21",
+      "retrieved": 5,
+      "verified": 5,
+      "rejected": 0,
+      "tampering_detected": true
+    }
+  ]
+}
