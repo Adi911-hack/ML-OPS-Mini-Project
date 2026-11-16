@@ -1,0 +1,52 @@
+{
+  "v1-basic": {
+    "paired_scenarios": 11,
+    "context_relevance_macro": 0.1497,
+    "context_relevance_denominator": 11,
+    "factual_reviewed_scenarios": 2,
+    "factual_reviewed_ids": [
+      "SC05",
+      "SC06"
+    ],
+    "factual_claims_reviewed": 6,
+    "groundedness_reviewed_subset": 1.0,
+    "faithfulness_reviewed_subset": 1.0,
+    "hallucination_rate_reviewed_subset": 0.0,
+    "unreviewed_scenarios": [
+      "SC01",
+      "SC02",
+      "SC03",
+      "SC04",
+      "SC07",
+      "SC11",
+      "SC12",
+      "SC13",
+      "SC14"
+    ]
+  },
+  "v2-exception-aware": {
+    "paired_scenarios": 11,
+    "context_relevance_macro": 0.14,
+    "context_relevance_denominator": 11,
+    "factual_reviewed_scenarios": 1,
+    "factual_reviewed_ids": [
+      "SC06"
+    ],
+    "factual_claims_reviewed": 3,
+    "groundedness_reviewed_subset": 1.0,
+    "faithfulness_reviewed_subset": 1.0,
+    "hallucination_rate_reviewed_subset": 0.0,
+    "unreviewed_scenarios": [
+      "SC01",
+      "SC02",
+      "SC03",
+      "SC04",
+      "SC05",
+      "SC07",
+      "SC11",
+      "SC12",
+      "SC13",
+      "SC14"
+    ]
+  }
+}
