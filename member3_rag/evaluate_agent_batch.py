@@ -1,11 +1,14 @@
 import argparse
 import inspect
 import json
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = BASE_DIR.parent
+BACKEND_DIR = PROJECT_DIR / "backend"
 CASES_FILE = BASE_DIR / "claim_evaluation_cases.json"
 RESULTS_DIR = BASE_DIR / "agent_evaluation_results"
 
@@ -19,10 +22,17 @@ def save_json(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
 
     temporary = path.with_suffix(".tmp")
+
     temporary.write_text(
-        json.dumps(data, indent=2, ensure_ascii=False, default=str),
+        json.dumps(
+            data,
+            indent=2,
+            ensure_ascii=False,
+            default=str
+        ),
         encoding="utf-8"
     )
+
     temporary.replace(path)
 
 
@@ -30,7 +40,28 @@ def load_json(path):
     if not path.exists():
         return {}
 
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(
+        path.read_text(encoding="utf-8")
+    )
+
+
+def check_interface():
+    backend_path = str(BACKEND_DIR)
+
+    if backend_path not in sys.path:
+        sys.path.insert(0, backend_path)
+
+    from app.agent_runner import run_agents
+
+    parameters = inspect.signature(run_agents).parameters
+
+    if "prompt_version" not in parameters:
+        raise RuntimeError(
+            "Prompt-version support is not installed. "
+            "Wait for Shristi's PR #13."
+        )
+
+    return run_agents
 
 
 def prepare_claim(case):
@@ -43,74 +74,67 @@ def prepare_claim(case):
         "downgrading"
     }
 
-    disruption_type = (
+    disruption = (
         category if category in valid_types else None
     )
 
     return {
-        "claim_description": case["claim"],
         "description": case["claim"],
-        "disruption_type": disruption_type,
-        "reported_disruption": disruption_type
+        "reported_disruption": disruption
     }
 
 
-def run_scenario(case, prompt_version):
-    from app.agents.claim_analyst import analyze_claim
-    from app.agents.entitlement_agent import evaluate_entitlement
-    from app.agents.workflow import (
-        normalize_claim_analysis,
-        attach_entitlement_review
-    )
-    from app.agents.rag_adapter import (
-        search_documents,
-        lookup_clause
-    )
+def normalize_citations(citations):
+    passages = []
 
-    signature = inspect.signature(evaluate_entitlement)
+    if not isinstance(citations, list):
+        return passages
 
-    if "prompt_version" not in signature.parameters:
-        raise RuntimeError(
-            "Shristi's prompt-version update is not installed yet. "
-            "Wait for her PR before running this evaluator."
-        )
+    for citation in citations:
+        if not isinstance(citation, dict):
+            continue
 
+        text = citation.get("text") or citation.get("passage")
+
+        if not text:
+            continue
+
+        passages.append({
+            "clause_id": citation.get("clause_id"),
+            "document": citation.get("document"),
+            "page": citation.get("page"),
+            "passage": text
+        })
+
+    return passages
+
+
+def run_scenario(case, version, run_agents):
     claim = prepare_claim(case)
 
-    analysis = analyze_claim(claim)
-
-    analysis = normalize_claim_analysis(
+    response = run_agents(
         claim,
-        analysis
+        prompt_version=version
     )
 
-    entitlement = evaluate_entitlement(
-        claim,
-        analysis,
-        search_function=search_documents,
-        clause_function=lookup_clause,
-        prompt_version=prompt_version
-    )
+    if not isinstance(response, dict):
+        raise ValueError("Agent returned an invalid response")
 
-    entitlement = attach_entitlement_review(
-        claim,
-        analysis,
-        entitlement
-    )
+    recorded_version = response.get("prompt_version")
 
-    recorded_version = entitlement.get("prompt_version")
-
-    if recorded_version != prompt_version:
+    if recorded_version != version:
         raise RuntimeError(
-            f"Prompt version mismatch: requested {prompt_version}, "
-            f"received {recorded_version}"
+            f"Prompt version mismatch: "
+            f"requested {version}, received {recorded_version}"
         )
 
-    review = entitlement.get("entitlement_review") or {}
+    review = response.get("entitlement_review") or {}
 
-    verification = entitlement.get("citation_verification") or {}
+    verification = response.get("citation_verification") or {}
 
-    passages = entitlement.get("retrieved_passages") or []
+    citations = normalize_citations(
+        response.get("citations") or []
+    )
 
     return {
         "scenario_id": case["id"],
@@ -120,19 +144,36 @@ def run_scenario(case, prompt_version):
         "expected_route": case["expected_route"],
         "expected_clauses": case["expected_clauses"],
         "prompt_version": recorded_version,
-        "analysis": analysis,
-        "entitlement_review": review,
-        "agent_route": review.get("route"),
+        "status": "completed",
+        "agent_route": response.get("route"),
+        "agent_outcome": response.get("outcome"),
         "agent_recommendation": review.get("recommendation"),
-        "agent_reasoning": review.get("reasoning"),
+        "agent_reasoning": (
+            review.get("reasoning")
+            or response.get("basis")
+        ),
+        "analysis": response.get("analysis") or {},
+        "entitlement_review": review,
         "supporting_clause_ids": review.get(
             "supporting_clause_ids", []
         ),
-        "retrieved_passages": passages,
+        "citations": citations,
+        "retrieved_passages": citations,
+        "context_source": "final_verified_citations",
+        "full_retrieval_context_available": False,
+        "verified": response.get("verified"),
         "citation_verification": verification,
-        "tool_calls": entitlement.get("tool_calls", []),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "status": "completed"
+        "monetary_compensation": response.get(
+            "monetary_compensation"
+        ),
+        "airport_assistance": response.get(
+            "airport_assistance"
+        ),
+        "regulatory_scope": response.get(
+            "regulatory_scope"
+        ),
+        "tool_calls": response.get("tool_calls", []),
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -142,7 +183,17 @@ def evaluate(versions, delay, limit):
     )
 
     if limit is not None:
+        if limit < 1:
+            raise ValueError("Limit must be positive")
+
         cases = cases[:limit]
+
+    try:
+        run_agents = check_interface()
+
+    except Exception as error:
+        print(f"SETUP ERROR: {error}")
+        return
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -159,20 +210,28 @@ def evaluate(versions, delay, limit):
 
             existing = results.get(case_id)
 
-            if existing and existing.get("status") == "completed":
+            if (
+                isinstance(existing, dict)
+                and existing.get("status") == "completed"
+            ):
                 print(f"{case_id} | SKIPPED")
                 continue
 
-            print(f"\nRunning {case_id}...")
+            print(f"\nRunning {case_id}...", flush=True)
 
             try:
-                result = run_scenario(case, version)
+                result = run_scenario(
+                    case,
+                    version,
+                    run_agents
+                )
 
                 results[case_id] = result
 
                 print(
                     f"{case_id} | COMPLETED | "
-                    f"Route: {result['agent_route']}"
+                    f"Route: {result['agent_route']} | "
+                    f"Citations: {len(result['citations'])}"
                 )
 
             except Exception as error:
@@ -190,21 +249,17 @@ def evaluate(versions, delay, limit):
 
                 save_json(results_file, results)
 
-                if (
-                    "prompt-version update" in str(error)
-                    or "Prompt version mismatch" in str(error)
-                ):
-                    return
+                error_text = str(error)
 
                 if (
-                    "429" in str(error)
-                    or "503" in str(error)
-                    or "RESOURCE_EXHAUSTED" in str(error)
+                    "429" in error_text
+                    or "503" in error_text
+                    or "RESOURCE_EXHAUSTED" in error_text
                 ):
-                    print(
-                        "API limit or service error detected. "
-                        "Progress saved. Stop and resume later."
-                    )
+                    print("API error detected. Progress saved.")
+                    return
+
+                if "Prompt version mismatch" in error_text:
                     return
 
             save_json(results_file, results)
@@ -213,12 +268,15 @@ def evaluate(versions, delay, limit):
                 time.sleep(delay)
 
         completed = sum(
-            item.get("status") == "completed"
+            isinstance(item, dict)
+            and item.get("status") == "completed"
             for item in results.values()
         )
 
-        print(f"\nCompleted: {completed}/{len(cases)}")
-        print(f"Saved to: {results_file}")
+        print("\n" + "=" * 45)
+        print(f"Version: {version}")
+        print(f"Completed: {completed}/{len(cases)}")
+        print(f"Results saved to: {results_file}")
 
 
 def main():
