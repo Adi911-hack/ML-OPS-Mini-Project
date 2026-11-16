@@ -1,4 +1,3 @@
-
 import json
 import os
 from typing import Literal
@@ -11,12 +10,15 @@ from pydantic import BaseModel, Field
 from app.agents.tools import create_entitlement_tools
 from app.agents.citation_verifier import verify_passages
 from app.agents.reliability import CircuitBreaker, CircuitOpenError
+from app.agents.stub_model import stub_enabled, stub_research_plan
 
 
 GEMINI_CIRCUIT_BREAKER = CircuitBreaker(
     failure_threshold=3,
     recovery_timeout=30
 )
+
+
 class ToolRequest(BaseModel):
     name: Literal[
         "get_claim_fields",
@@ -166,7 +168,10 @@ def fallback_plan(disruption_type):
 
     for query in selected:
         requests.append(
-            ToolRequest(name="search_corpus", query=query)
+            ToolRequest(
+                name="search_corpus",
+                query=query
+            )
         )
 
     return ResearchPlan(
@@ -204,20 +209,26 @@ def execute_research_plan(
 
         if name == "search_corpus":
             argument = request.query.strip()
+
             if not argument:
                 continue
+
             payload = {"query": argument}
 
         elif name == "get_clause_by_id":
             argument = request.clause_id.strip()
+
             if not argument:
                 continue
+
             payload = {"clause_id": argument}
 
         else:
             fields = request.field_names
+
             if not fields:
                 continue
+
             argument = json.dumps(fields)
             payload = {"field_names": fields}
 
@@ -245,11 +256,13 @@ def execute_research_plan(
 
         if name == "search_corpus":
             passages = data.get("passages", [])
+
             if isinstance(passages, list):
                 evidence.extend(passages)
 
         elif name == "get_clause_by_id":
             clause = data.get("clause")
+
             if isinstance(clause, dict):
                 evidence.append(clause)
 
@@ -292,7 +305,10 @@ def add_required_clauses(
         ]
     }
 
-    required = required_by_type.get(disruption_type, [])
+    required = required_by_type.get(
+        disruption_type,
+        []
+    )
 
     existing_ids = {
         item["clause_id"]
@@ -314,11 +330,13 @@ def add_required_clauses(
             or not isinstance(result.get("clause"), dict)
         ):
             missing_clauses.append(clause_id)
+
             tool_calls.append({
                 "name": "get_clause_by_id",
                 "input": {"clause_id": clause_id},
                 "status": "unavailable"
             })
+
             continue
 
         clause = result["clause"]
@@ -367,7 +385,10 @@ def finalize_research(
 
     evidence = list(unique.values())
 
-    print("Agent 2: Verifying citations...", flush=True)
+    print(
+        "Agent 2: Verifying citations...",
+        flush=True
+    )
 
     verification = verify_passages(
         evidence,
@@ -400,18 +421,24 @@ def finalize_research(
             "Required regulatory clauses could not be retrieved: "
             + ", ".join(missing_clauses)
         )
+
     elif verification["rejected_count"] > 0:
         reason = (
             "Some regulatory citations failed verification "
             "and require human review."
         )
+
     elif not verified_evidence:
-        reason = "No verified regulatory evidence is available."
+        reason = (
+            "No verified regulatory evidence is available."
+        )
+
     elif used_fallback:
         reason = (
             "Fallback retrieval completed and citations matched "
             "the RAG index. Entitlement verification is pending."
         )
+
     else:
         reason = (
             "Regulatory citations matched the RAG index. "
@@ -434,9 +461,11 @@ def evaluate_entitlement(
     clause_function=None,
     prompt_version=DEFAULT_PROMPT_VERSION
 ):
-
     load_dotenv(dotenv_path=".env")
-    selected_prompt = get_entitlement_prompt(prompt_version)
+
+    selected_prompt = get_entitlement_prompt(
+        prompt_version
+    )
 
     if search_function is None or clause_function is None:
         return safe_escalation(
@@ -444,6 +473,36 @@ def evaluate_entitlement(
         )
 
     disruption_type = analysis.get("disruption_type")
+
+    if stub_enabled():
+        print(
+            "Agent 2: Using stub model",
+            flush=True
+        )
+
+        plan = stub_research_plan(disruption_type)
+
+        tool_calls, evidence = execute_research_plan(
+            plan,
+            claim,
+            search_function,
+            clause_function
+        )
+
+        evidence, tool_calls, missing_clauses = add_required_clauses(
+            disruption_type,
+            evidence,
+            tool_calls,
+            clause_function
+        )
+
+        return finalize_research(
+            evidence,
+            tool_calls,
+            clause_function,
+            missing_clauses,
+            used_fallback=True
+        )
 
     model_name = os.getenv("MODEL_NAME")
     api_key = os.getenv("GOOGLE_API_KEY")
@@ -470,7 +529,10 @@ def evaluate_entitlement(
         "analysis": analysis
     }
 
-    print("Agent 2: Planning retrieval...", flush=True)
+    print(
+        "Agent 2: Planning retrieval...",
+        flush=True
+    )
 
     used_fallback = False
 
@@ -496,6 +558,7 @@ def evaluate_entitlement(
 
         used_fallback = True
         plan = fallback_plan(disruption_type)
+
     except GoogleAPIError as error:
         if "503" not in str(error):
             raise
@@ -508,7 +571,10 @@ def evaluate_entitlement(
         used_fallback = True
         plan = fallback_plan(disruption_type)
 
-    print("Agent 2: Executing selected tools...", flush=True)
+    print(
+        "Agent 2: Executing selected tools...",
+        flush=True
+    )
 
     tool_calls, evidence = execute_research_plan(
         plan,

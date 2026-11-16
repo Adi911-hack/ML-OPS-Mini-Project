@@ -1,0 +1,12 @@
+services:
+  api:
+    environment:
+      RATE_LIMIT_PER_MINUTE: "10000"
+
+  agent-worker:
+    environment:
+      MODEL_PROVIDER: stub
+      STUB_MODEL_DELAY_MS: "500"
+      RATE_LIMIT_PER_MINUTE: "10000"
+      GOOGLE_API_KEY: "stub-disabled"
+      MODEL_NAME: "stub-disabled"

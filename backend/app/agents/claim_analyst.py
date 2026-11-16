@@ -3,6 +3,7 @@ import json
 import os
 import time
 from typing import Literal
+from app.agents.stub_model import stub_enabled, stub_analyze_claim
 
 from dotenv import load_dotenv
 from langchain.agents import create_agent
@@ -187,6 +188,9 @@ CLAIM_GEMINI_BREAKER = CircuitBreaker(
 def analyze_claim(claim_data):
     load_dotenv(dotenv_path=".env")
     claim = PassengerClaim.model_validate(claim_data)
+    
+    if stub_enabled():
+        return stub_analyze_claim(claim)
 
     model_name = os.getenv("MODEL_NAME")
     api_key = os.getenv("GOOGLE_API_KEY")
