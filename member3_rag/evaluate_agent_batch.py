@@ -133,41 +133,43 @@ def claim_fingerprint(claim, version):
     ).hexdigest()
 
 
-def normalize_citations(citations):
-    passages = []
+def normalize_passages(passages):
+    normalized = []
 
-    if not isinstance(citations, list):
-        return passages
+    if not isinstance(passages, list):
+        return normalized
 
-    for citation in citations:
-        if not isinstance(citation, dict):
+    for passage in passages:
+        if not isinstance(passage, dict):
             continue
 
         text = (
-            citation.get("text")
-            or citation.get("passage")
+            passage.get("passage")
+            or passage.get("text")
         )
 
         if not text:
             continue
 
-        passages.append({
-            "clause_id": citation.get("clause_id"),
-            "document": citation.get("document"),
-            "page": citation.get("page"),
+        normalized.append({
+            "clause_id": passage.get("clause_id"),
+            "document": (
+                passage.get("document")
+                or passage.get("source")
+            ),
+            "page": passage.get("page"),
             "passage": text
         })
 
-    return passages
+    return normalized
 
 
-def classify_result(response, citations):
+def classify_result(response, passages):
     scope = response.get("regulatory_scope") or {}
     verification = response.get("citation_verification") or {}
     analysis = response.get("analysis") or {}
 
     scope_status = scope.get("status")
-    verification_status = verification.get("status")
 
     if scope_status in {"outside", "unknown"}:
         return "completed"
@@ -175,18 +177,21 @@ def classify_result(response, citations):
     if scope_status != "supported":
         return "needs_review"
 
+    if response.get("used_fallback") is not False:
+        return "fallback"
+
     missing = analysis.get("missing_fields") or []
 
     if "claim_analysis_unavailable" in missing:
         return "needs_review"
 
-    if verification_status != "passed":
+    if verification.get("status") != "passed":
         return "needs_review"
 
     if verification.get("rejected_count", 0) != 0:
         return "needs_review"
 
-    if not citations:
+    if not passages:
         return "needs_review"
 
     return "completed"
@@ -214,11 +219,18 @@ def run_scenario(case, version, run_agents):
     review = response.get("entitlement_review") or {}
     verification = response.get("citation_verification") or {}
 
-    citations = normalize_citations(
+    citations = normalize_passages(
         response.get("citations") or []
     )
 
-    status = classify_result(response, citations)
+    retrieved_passages = normalize_passages(
+        response.get("retrieved_passages") or []
+    )
+
+    status = classify_result(
+        response,
+        retrieved_passages
+    )
 
     return {
         "scenario_id": case["id"],
@@ -231,6 +243,7 @@ def run_scenario(case, version, run_agents):
         "expected_clauses": case["expected_clauses"],
         "prompt_version": recorded_version,
         "status": status,
+        "used_fallback": response.get("used_fallback"),
         "agent_route": response.get("route"),
         "agent_outcome": response.get("outcome"),
         "agent_recommendation": review.get("recommendation"),
@@ -244,9 +257,9 @@ def run_scenario(case, version, run_agents):
             "supporting_clause_ids", []
         ),
         "citations": citations,
-        "retrieved_passages": citations,
-        "context_source": "final_verified_citations",
-        "full_retrieval_context_available": False,
+        "retrieved_passages": retrieved_passages,
+        "context_source": "verified_rag_evidence",
+        "full_retrieval_context_available": True,
         "verified": response.get("verified"),
         "citation_verification": verification,
         "monetary_compensation": response.get(
@@ -306,9 +319,22 @@ def evaluate(versions, delay, limit):
                 isinstance(existing, dict)
                 and existing.get("status") == "completed"
                 and existing.get("input_fingerprint") == fingerprint
+                and existing.get("used_fallback") is False
             ):
                 print(f"{case_id} | SKIPPED")
                 continue
+
+            previous_attempts = []
+
+            if isinstance(existing, dict):
+                previous_attempts = list(
+                    existing.get("previous_attempts") or []
+                )
+
+                archived = dict(existing)
+                archived.pop("previous_attempts", None)
+
+                previous_attempts.append(archived)
 
             print(f"\nRunning {case_id}...", flush=True)
 
@@ -319,19 +345,18 @@ def evaluate(versions, delay, limit):
                     run_agents
                 )
 
+                result["previous_attempts"] = previous_attempts
+
                 results[case_id] = result
 
                 print(
                     f"{case_id} | "
                     f"{result['status'].upper()} | "
+                    f"Fallback: {result['used_fallback']} | "
                     f"Route: {result['agent_route']} | "
+                    f"Passages: {len(result['retrieved_passages'])} | "
                     f"Citations: {len(result['citations'])}"
                 )
-
-                if result["status"] == "needs_review":
-                    print(
-                        "Response needs investigation before scoring."
-                    )
 
             except Exception as error:
                 results[case_id] = {
@@ -339,6 +364,7 @@ def evaluate(versions, delay, limit):
                     "prompt_version": version,
                     "status": "error",
                     "error": str(error),
+                    "previous_attempts": previous_attempts,
                     "timestamp": datetime.now(
                         timezone.utc
                     ).isoformat()
@@ -369,12 +395,13 @@ def evaluate(versions, delay, limit):
         completed = sum(
             isinstance(item, dict)
             and item.get("status") == "completed"
+            and item.get("used_fallback") is False
             for item in results.values()
         )
 
         print("\n" + "=" * 45)
         print(f"Version: {version}")
-        print(f"Completed: {completed}/{len(cases)}")
+        print(f"Non-fallback completed: {completed}/{len(cases)}")
         print(f"Results saved to: {results_file}")
 
 
